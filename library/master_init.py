@@ -13,15 +13,15 @@ def run(module, cmd_list):
 def main():
     module = AnsibleModule(
         argument_spec={
-            'pod_cidr':          {'type': 'str', 'required': True},
-            'control_endpoint':  {'type': 'str', 'required': True},
+            'cluster_cidr':          {'type': 'str', 'required': True},
+            'cluster_endpoint':  {'type': 'str', 'required': True},
             'kube_user':         {'type': 'str', 'required': True}, 
         },
         supports_check_mode=False
     )
 
-    pod_cidr = module.params['pod_cidr']
-    endpoint = module.params['control_endpoint']
+    cluster_cidr = module.params['cluster_cidr']
+    cluster_endpoint = module.params['cluster_endpoint']
 
     # 1. Disable swap
     run(module, ['swapoff', '-a'])
@@ -45,9 +45,10 @@ def main():
     # 5. kubeadm init
     init_cmd = [
         'kubeadm','init',
-        f'--control-plane-endpoint={endpoint}',
-        f'--pod-network-cidr={pod_cidr}',
-        '--cri-socket=unix:///run/containerd/containerd.sock'
+        f'--control-plane-endpoint={cluster_endpoint}',
+        f'--pod-network-cidr={cluster_cidr}',
+        '--cri-socket=unix:///run/containerd/containerd.sock',
+        '--upload-certs'
     ]
     rc, out, err = module.run_command(init_cmd)
     if rc != 0:
@@ -69,18 +70,45 @@ def main():
     
     # extract join info
     lines = out.splitlines()
-    full = ' '.join(lines[-2:]).replace('\\', '').replace('\t', ' ')
-    m = re.search(r'kubeadm join\s+(\S+)\s+--token\s+(\S+)\s+--discovery-token-ca-cert-hash\s+(\S+)', full)
-    if not m:
-        module.fail_json(msg='join command error', stdout=out)
-    join_endpoint, token, hashval = m.group(1), m.group(2), m.group(3)
+    join_lines = []
+    capture = False
 
-    module.exit_json(
-        changed=True,
-        join_endpoint=join_endpoint,
-        token=token,
-        discovery_token_hash=hashval
+    for l in lines:
+        stripped = l.rstrip()
+        if not capture and stripped.lstrip().startswith("kubeadm join"):
+            capture = True
+        if capture:
+            join_lines.append(stripped.replace("\\", "").strip())
+            if not stripped.endswith("\\"):
+                break
+
+    full = " ".join(join_lines)
+
+    pattern = (
+        r"kubeadm join\s+(\S+)"                             # endpoint
+        r".*?--token\s+(\S+)"                               # token
+        r".*?--discovery-token-ca-cert-hash\s+(\S+)"        # hash
+        r"(?:.*?--certificate-key\s+(\S+))?"                # optional cert-key
     )
+    m = re.search(pattern, full)
+    if not m:
+        module.fail_json(msg="join command error", stdout=out)
+
+    join_endpoint   = m.group(1)
+    token           = m.group(2)
+    discovery_hash  = m.group(3)
+    certificate_key = m.group(4)  # 若未指定则为 None
+
+    result = {
+        "changed": True,
+        "join_endpoint": join_endpoint,
+        "token": token,
+        "discovery_token_hash": discovery_hash,
+    }
+    if certificate_key:
+        result["certificate_key"] = certificate_key
+
+    module.exit_json(**result)
 
 if __name__ == '__main__':
     main()

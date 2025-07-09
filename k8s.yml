@@ -1,5 +1,5 @@
 - name: install k8s-deps (Docker, containerd, kubelet/kubeadm/kubectl)
-  hosts: masters,nodes
+  hosts: control_plan,masters,nodes
   become: true
   vars:
     ansible_become_password: "{{ secret }}"
@@ -7,30 +7,52 @@
     - install-k8s-deps
 
 - name: Deploy Kubernetes Master and generate tokens
-  hosts: masters 
+  hosts: control_plan
   become: true 
   vars:
     ansible_become_password: "{{ secret }}"
   tasks:     
     - name: Init Kubernetes Master
       master_init:
-        pod_cidr: "{{ master_cidr_args }}"
-        control_endpoint: "{{ master_endpoint_args }}"
+        cluster_cidr: "{{ cluster_cidr_args }}"
+        cluster_endpoint: "{{ cluster_endpoint_args }}"
         kube_user: "{{ ansible_user }}"
       register: init_out
     - debug:
         msg:
-          - "pod cidr: {{ master_cidr_args }}"
+          - "cluster_cidr: {{ cluster_cidr_args }}"
           - "join_endpoint: {{ init_out.join_endpoint }}"
           - "token: {{ init_out.token }}"
           - "discovery_token_hash: {{ init_out.discovery_token_hash }}"
+          - "certificate_key: {{ init_out.certificate_key }}"
+
+- name: Join Kubernetes Master
+  hosts: masters
+  become: true
+  vars:
+    ansible_become_password: "{{ secret }}"
+    master_host: "{{ groups['control_plan'][0] }}"
+    join_endpoint: "{{ hostvars[master_host].init_out.join_endpoint }}"
+    token: "{{ hostvars[master_host].init_out.token }}"
+    discovery_token_hash: "{{ hostvars[master_host].init_out.discovery_token_hash }}"
+    certificate_key: "{{ hostvars[master_host].init_out.certificate_key }}"
+  tasks:
+    - name: Join Kubernetes Master
+      master_join:
+        join_endpoint: "{{ join_endpoint }}"
+        token: "{{ token }}"
+        discovery_token_hash: "{{ discovery_token_hash }}"
+        certificate_key: "{{ certificate_key }}"
+      register: master_join_out
+    - debug:
+        msg: "Join output: {{ master_join_out.stdout }}"
 
 - name: Deploy Kubernetes Worker and using tokens
   hosts: nodes                    
   become: true                
   vars:
     ansible_become_password: "{{ secret }}"
-    master_host: "{{ groups['masters'][0] }}"
+    master_host: "{{ groups['control_plan'][0] }}"
     join_endpoint: "{{ hostvars[master_host].init_out.join_endpoint }}"
     token: "{{ hostvars[master_host].init_out.token }}"
     discovery_token_hash: "{{ hostvars[master_host].init_out.discovery_token_hash }}"
@@ -45,16 +67,16 @@
         msg: "Join output: {{ join_out.stdout }}"
 
 - name: install Cilium
-  hosts: masters
+  hosts: control_plan
   become: true
   vars:
     ansible_become_password: "{{ secret }}"
-    cilium_cluster_cidr: "{{ master_cidr_args }}"
+    cilium_cluster_cidr: "{{ cluster_cidr_args }}"
   roles:
     - install-cilium
 
 - name: install Nvidia-GPU-Operator
-  hosts: masters
+  hosts: control_plan
   become: true
   vars:
     ansible_become_password: "{{ secret }}"
