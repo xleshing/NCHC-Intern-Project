@@ -18,7 +18,32 @@
 
 - roles/* 
 : 安裝 Cilium CNI, Kubernetes 依賴套件（Docker、kubeadm、kubectl、kubelet 等）與 NVIDIA GPU Operator 的 role
- 
+
+>  變數說明
+> - controlplan ansible_host
+> : 執行 kubectl 指令的host ip（已設定 .kube）
+> 
+> - master_i ansible_host
+> : 其他 control-plan ip (未設定 .kube，執行 kubectl 命令時，會找不到api server) 
+>  
+> - node_i ansible_host
+> : worker node ip
+> 
+> - nfsserver ansible_host
+> : nfs server ip
+> 
+> - cluster_cidr_args
+> : cluster cidr (xxx.xxx.xxx.xxx/xx)
+> 
+> - cluster_endpoint_args
+> : cluster endpoint (xxx.xxx.xxx.xxx:xxxxx)
+> 
+> - nfs_server_args
+> : nfs server ip (會自動取用nfs_server group 裡的第一個 ip)
+> 
+> - nfs_path_args
+> : nfs 共享目錄
+
 ---
 ## 使用方法
 ```
