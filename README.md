@@ -44,7 +44,6 @@
 > - nfs_path_args
 > : nfs 共享目錄
 
----
 ## 使用方法
 ```
 ansible-playbook -i inventory.ini k8s.yml
