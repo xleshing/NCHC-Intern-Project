@@ -8,16 +8,13 @@
 
 
 - inventory.ini
-: INI 格式的 Inventory，定義 master 與 node 的主機清單、SSH 連線資訊，以及 cluster cidr, master endpoint, cilium version 等變數。
+: INI 格式的 Inventory，定義 control-plan, masters 與 node 的主機清單、SSH 連線資訊，以及 cluster cidr, cluster endpoint, cilium version 等變數。
 
 - k8s.yml
 : 主 Playbook
 
-- kp1751511188256.pem
-: SSH Key
-
 - library/*
-: 自訂 module，負責 master, worker 節點初始化
+: 自訂 module，負責 control-plan 初始化、 masters, workers 節點初始化與加入
 
 - roles/* 
 : 安裝 Cilium CNI, Kubernetes 依賴套件（Docker、kubeadm、kubectl、kubelet 等）與 NVIDIA GPU Operator 的 role
@@ -25,7 +22,9 @@
 ---
 ## 使用方法
 ```
-ansible-playbook -i inventory.ini k8s.yml --private-key kp1751511188256.pem
+ansible-playbook -i inventory.ini k8s.yml
 ```
-> cluster cidr, master endpoint, cilium version 等變數在 inventory.ini 裡設定
+> control-plan, masters 與 workers 的主機清單, SSH 連線資訊, cluster cidr, cluster endpoint, cilium version 等變數在 inventory.ini 裡設定
+
+> 由於無法繞過首次登陸強制變更密碼機制，須先設定完密碼才能使用該腳本
 
