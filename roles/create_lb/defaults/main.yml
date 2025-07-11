@@ -1,0 +1,16 @@
+twcc_api_host: "openstack-taichung-default-2"
+twcc_project_id: "86334"
+twcc_solution_id: "5125"
+twcc_api_key: "01e0363c-0b09-4d42-a8ef-866d3c23e28f"
+lb_name: "{{ hostvars[ groups['control_plan'][0] ].vars.vm_name.split('_')[0]  }}"
+lb_desc: ""
+pool_protocol: "TCP"
+pool_port: "6443"
+members_port: "6443"
+method: "ROUND_ROBIN"
+private_ip_name: "default_network"
+enable_pub_ip: "false"
+initial_waiting_time: 60  # 秒
+poll_interval: 30  # 秒
+poll_retries: 10    # 次
+target_group: "loadbalancer"

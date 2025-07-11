@@ -1,0 +1,130 @@
+- name: init pool_members_list
+  set_fact:
+    pool_members: []
+
+- name: add control_plan + masters to pool_members_list
+  set_fact:
+    pool_members: "{{ pool_members + [ { 'ip': hostvars[item].vars.ansible_host, 'port': members_port } ] }}"
+  loop: "{{ (groups['control_plan'] | default([])) + (groups['masters'] | default([])) }}"
+  loop_control:
+    loop_var: item
+
+- name: get TWCC private list
+  uri:
+    url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/networks/?project={{ twcc_project_id }}"
+    method: GET
+    headers:
+      Accept:        "application/json"
+      x-api-host:    "{{ twcc_api_host }}"
+      x-api-key:     "{{ twcc_api_key }}"
+    return_content: yes
+  register: network_list  
+
+
+- name: filter private ip list
+  set_fact:
+    private_ip_id: >-
+      {{ (network_list.json
+          | selectattr('name', 'equalto', private_ip_name)
+          | map(attribute='id')
+          | list
+        )[0] }}
+  when: network_list.json is defined and network_list.json | length > 0
+
+- debug:
+    msg:
+      headers:
+        Content-Type: application/json
+        Accept: application/json
+        x-api-host: "{{ twcc_api_host }}"
+        x-api-key: "{{ twcc_api_key }}"
+      body_format: json
+      body:
+        name: "{{ lb_name }}lb"
+        desc: "{{ lb_desc }}"
+        private_net: "{{ private_ip_id }}"
+        enable_public_ip: "{{ enable_pub_ip | bool }}"
+        pools:
+          - name: "{{ lb_name }}pool"
+            protocol: "{{ pool_protocol }}"
+            members: "{{ pool_members }}"
+            method: "{{ method }}"
+        listeners:
+          - name: "{{ lb_name }}listener"
+            pool_name: "{{ lb_name }}pool"
+            protocol: "{{ pool_protocol }}"
+            protocol_port: "{{ pool_port }}"
+
+- name: Create LB via TWCC API
+  uri:
+    url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/loadbalancers/"
+    method: POST
+    headers:
+      Content-Type: application/json
+      Accept: application/json
+      x-api-host: "{{ twcc_api_host }}"
+      x-api-key: "{{ twcc_api_key }}"
+    body_format: json
+    body: 
+      name: "{{ lb_name }}lb"
+      desc: "{{ lb_desc }}"
+      private_net: "{{ private_ip_id }}"
+      enable_public_ip: "{{ enable_pub_ip | bool }}"
+      pools:
+        - name: "{{ lb_name }}pool"
+          protocol: "{{ pool_protocol }}"
+          members: "{{ pool_members }}"
+          method: "{{ method }}"
+      listeners:
+        - name: "{{ lb_name }}listener" 
+          pool_name: "{{ lb_name }}pool"
+          protocol: "{{ pool_protocol }}"
+          protocol_port: "{{ pool_port }}"
+    status_code: [200, 201]
+  register: create_response
+
+- name: Pause for initial provisioning
+  pause:
+    seconds: "{{ initial_waiting_time }}"
+
+- name: Fetch list of loadbalancers to find LB_ID
+  uri:
+    url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/loadbalancers/?project={{ twcc_project_id }}"
+    method: GET
+    headers:
+      Accept: application/json
+      x-api-host: "{{ twcc_api_host }}"
+      x-api-key: "{{ twcc_api_key }}"
+  register: lb_response
+
+- name: Determine LB_ID of created LB
+  set_fact:
+    lb_id: >-
+      {{ (lb_response.json | selectattr('name','equalto', lb_name + "lb") | sort(attribute='create_time'))[-1].id }}
+
+- name: Poll until LB status is ACTIVE
+  uri:
+    url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/loadbalancers/{{ lb_id }}/"
+    method: GET
+    headers:
+      Accept: application/json
+      x-api-host: "{{ twcc_api_host }}"
+      x-api-key: "{{ twcc_api_key }}"
+  register: status_check
+  until: "status_check.json.status | default([]) | length > 0 and status_check.json.status == 'ACTIVE'"
+  retries: "{{ poll_retries }}"
+  delay: "{{ poll_interval }}"
+- debug:
+    msg: "Polling attempts: {{ status_check.attempts }}"
+
+- name: Set LB IP fact
+  set_fact:
+    lb_ip: "{{ status_check.json.private_ip }}"
+
+- name: 把 LB 加到 inventory
+  add_host:
+    name: "{{ status_check.json.private_ip }}:{{ pool_port }}"
+    groups: "{{ target_group }}"
+    ansible_user: "{{ ssh_user }}"
+    vars:
+      ansible_host: "{{ status_check.json.private_ip }}:{{ pool_port }}"
