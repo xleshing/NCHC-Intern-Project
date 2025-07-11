@@ -1,0 +1,134 @@
+- name: Set unique VM name with timestamp
+  set_fact:
+    unique_name: "{{ lookup('pipe', 'date +%s') }}_{{ vm_name }}"
+
+- name: Fetch Ubuntu images for specified version
+  uri:
+    url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/images/?project={{ twcc_project_id }}&name={{ ubuntu_version }}"
+    method: GET
+    headers:
+      Accept: application/json
+      x-api-host: "{{ twcc_api_host }}"
+      x-api-key: "{{ twcc_api_key }}"
+  register: images_response
+
+- name: Filter images by ubuntu_version
+  set_fact:
+    ubuntu_images: >-
+      {{ images_response.json
+         | selectattr('name', 'search', ubuntu_version)
+         | list }}
+
+- name: Determine latest Ubuntu image name
+  set_fact:
+    latest_image_name: >-
+      {{ (images_response.json | sort(attribute='create_time'))[-1].name }}
+- debug:
+    msg:
+      headers:
+        x-extra-property-image: "{{ latest_image_name }}"
+        x-extra-property-flavor: "{{ flavor }}"
+        x-extra-property-keypair: "{{ key_pair_name }}"
+        x-extra-property-private-network: "{{ private_network }}"
+        x-extra-property-sg: "{{ sg_name }}"
+        x-extra-property-system-volume-size: "{{ volume_size }}"
+        x-extra-property-system-volume-type: "{{ volume_type }}" 
+        x-extra-property-command: "{{ init_command }}"
+        x-api-host: "{{ twcc_api_host }}"
+        x-api-key: "{{ twcc_api_key }}"
+      body:
+        project: "{{ twcc_project_id }}"
+        desc: "{{ vm_desc }}"
+        solution: "{{ twcc_solution_id }}"
+        name: "{{ unique_name }}"
+
+- name: Create VM via TWCC API
+  uri:
+    url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/sites/"
+    method: POST
+    headers:
+      Content-Type: application/json
+      Accept: application/json
+      x-extra-property-image: "{{ latest_image_name }}"
+      x-extra-property-flavor: "{{ flavor }}"
+      x-extra-property-keypair: "{{ key_pair_name }}"
+      x-extra-property-private-network: "{{ private_network }}"
+      x-extra-property-sg: "{{ sg_name }}"
+      x-extra-property-system-volume-size: "{{ volume_size }}"
+      x-extra-property-system-volume-type: "{{ volume_type }}"
+      x-extra-property-command: "{{ init_command }}"
+      x-api-host: "{{ twcc_api_host }}"
+      x-api-key: "{{ twcc_api_key }}"
+    body_format: json
+    body: 
+      project: "{{ twcc_project_id }}"
+      desc: "{{ vm_desc }}"
+      solution: "{{ twcc_solution_id }}"
+      name: "{{ unique_name }}"
+    status_code: [200, 201]
+  register: create_response
+
+- name: Pause for initial provisioning
+  pause:
+    seconds: "{{ initial_waiting_time }}"
+
+- name: Fetch list of sites to find SITE_ID
+  uri:
+    url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/sites/?project={{ twcc_project_id }}"
+    method: GET
+    headers:
+      Accept: application/json
+      x-api-host: "{{ twcc_api_host }}"
+      x-api-key: "{{ twcc_api_key }}"
+  register: sites_response
+
+- name: Determine SITE_ID of created VM
+  set_fact:
+    site_id: >-
+      {{ (sites_response.json | selectattr('name','equalto', unique_name) | sort(attribute='create_time'))[-1].id }}
+
+- name: Poll until VM status is ACTIVE
+  uri:
+    url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/sites/{{ site_id }}/"
+    method: GET
+    headers:
+      Accept: application/json
+      x-api-host: "{{ twcc_api_host }}"
+      x-api-key: "{{ twcc_api_key }}"
+  register: status_check
+  until: "status_check.json.servers | default([]) | length > 0 and status_check.json.servers[0].status == 'ACTIVE'"
+  retries: "{{ poll_retries }}"
+  delay: "{{ poll_interval }}"
+- debug:
+    msg: "Polling attempts: {{ status_check.attempts }}"
+
+- name: Retrieve VM internal IP
+  uri:
+    url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/servers/?project={{ twcc_project_id }}&site={{ site_id }}"
+    method: GET
+    headers:
+      Accept: application/json
+      x-api-host: "{{ twcc_api_host }}"
+      x-api-key: "{{ twcc_api_key }}"
+  register: server_info
+
+- name: Set VM IP fact
+  set_fact:
+    vm_ip: "{{ server_info.json[0].private_nets[0].ip }}"
+
+- name: Wait for SSH to become available
+  wait_for:
+    host: "{{ vm_ip }}"
+    port: "{{ vm_ssh_port }}"
+    delay: "{{ ssh_interval }}"
+    timeout: "{{ ssh_timeout }}"
+    state: started
+
+- name: 把這台 VM 加到 inventory
+  add_host:
+    name: "{{ server_info.json[0].private_nets[0].ip }}"
+    groups: "{{ target_group }}"
+    ansible_user: "{{ ssh_user }}"
+    vars:
+      ansible_host: "{{ server_info.json[0].private_nets[0].ip }}"
+      vm_name: "{{ unique_name }}"

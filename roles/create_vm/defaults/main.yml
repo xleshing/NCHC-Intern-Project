@@ -1,0 +1,23 @@
+twcc_api_host: "openstack-taichung-default-2"
+twcc_project_id: "86334"
+twcc_solution_id: "5125"
+twcc_api_key: "01e0363c-0b09-4d42-a8ef-866d3c23e28f"
+key_pair_name: "kp1751511188256"
+flavor: "v.xsuper"
+volume_size: 200
+volume_type: "block_storage-hdd"
+private_network: "default_network"
+sg_name: "5352534_vm1751511071443_sg"
+ssh_user: "{{ ssh_user }}"
+new_password: "{{ secret }}"
+ssh_private_key_path: "~/.ssh/id_rsa"
+vm_name: "APItest"
+vm_desc: ""
+initial_waiting_time: 60  # 秒
+poll_interval: 30  # 秒
+poll_retries: 10    # 次
+vm_ssh_port: 22
+ssh_interval: 10
+ssh_timeout: 300
+ubuntu_version: "Ubuntu-22.04"
+init_command: sed -i '1iaccount sufficient pam_permit.so' /etc/pam.d/common-account  && echo "{{ ssh_user }}:{{ new_password }}" | chpasswd && printf "{{ ssh_user }} ALL=(ALL) NOPASSWD:ALL\n" >/etc/sudoers.d/{{ ssh_user }} && chmod 440 /etc/sudoers.d/{{ ssh_user }}
