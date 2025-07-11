@@ -1,0 +1,44 @@
+- name: Use provided delete_count
+  set_fact:
+    delete_count: "{{ delete_count | int }}"
+
+- name: Fetch all lb for project
+  uri:
+    url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/loadbalancers/?project={{ twcc_project_id }}"
+    method: GET
+    headers:
+      Accept: application/json
+      x-api-host: "{{ twcc_api_host }}"
+      x-api-key: "{{ twcc_api_key }}"
+  register: lb_response
+
+- name: Select oldest {{ delete_count }} lb IDs
+  set_fact:
+    lb_ids_to_delete: >-
+      {{ (lb_response.json
+        | sort(attribute='create_time')
+        | reverse
+        | map(attribute='id')
+        | list)[:(delete_count | int )] }}
+
+- name: Confirm deletion of lb_ids
+  pause:
+    prompt: "即將刪除以下 LB IDs: {{ lb_ids_to_delete }}，按 Enter 繼續，Ctrl+C 取消"
+
+- name: Delete selected LBs
+  uri:
+    url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/loadbalancers/{{ item }}/"
+    method: DELETE
+    headers:
+      x-api-host: "{{ twcc_api_host }}"
+      x-api-key: "{{ twcc_api_key }}"
+    status_code: [200,204]
+  loop: "{{ lb_ids_to_delete }}"
+  loop_control:
+    label: "{{ item }}"
+  register: delete_results
+
+- name: Show deletion results
+  debug:
+    msg: "Deleted LB_ID {{ item.item }}: HTTP status {{ item.status }}"
+  loop: "{{ delete_results.results }}"
