@@ -24,13 +24,13 @@ def main():
     cluster_endpoint = module.params['cluster_endpoint']
 
     # 1. Disable swap
-    run(module, ['swapoff', '-a'])
-    run(module, ['sed', '-i.bak', '-E', r's@^([^#].*\s+swap\s+)@#\1@', '/etc/fstab'])
+    run(module, ['sudo', 'swapoff', '-a'])
+    run(module, ['sudo', 'sed', '-i.bak', '-E', r's@^([^#].*\s+swap\s+)@#\1@', '/etc/fstab'])
 
     # 2. Enable IPv4 forwarding
     sysctl_conf = '/etc/sysctl.d/k8s.conf'
     run(module, ['bash', '-c', f"echo 'net.ipv4.ip_forward = 1' > {sysctl_conf}"])
-    run(module, ['sysctl', '--system'])
+    run(module, ['sudo', 'sysctl', '--system'])
 
     # config containerd
     run(module, ['mkdir', '-p', '/etc/containerd'])
@@ -40,11 +40,11 @@ def main():
       r's/SystemdCgroup\s*=\s*false/SystemdCgroup = true/',
       '/etc/containerd/config.toml'
     ])
-    run(module, ['systemctl','restart','containerd'])
+    run(module, ['sudo', 'systemctl','restart','containerd'])
 
     # 5. kubeadm init
     init_cmd = [
-        'kubeadm','init',
+        'sudo', 'kubeadm','init',
         f'--control-plane-endpoint={cluster_endpoint}',
         f'--pod-network-cidr={cluster_cidr}',
         '--cri-socket=unix:///run/containerd/containerd.sock',
@@ -65,8 +65,8 @@ def main():
     kube_dir   = os.path.dirname(kubeconfig)
 
     run(module, ['/bin/mkdir', '-p', kube_dir])
-    run(module, ['/bin/cp', '/etc/kubernetes/admin.conf', kubeconfig])
-    run(module, ['/bin/chown', f'{kube_user}:{kube_user}', kubeconfig]) 
+    run(module, ['sudo', '/bin/cp', '/etc/kubernetes/admin.conf', kubeconfig])
+    run(module, ['sudo', '/bin/chown', f'{kube_user}:{kube_user}', kubeconfig]) 
     
     # extract join info
     lines = out.splitlines()

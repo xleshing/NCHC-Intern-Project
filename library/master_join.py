@@ -28,13 +28,13 @@ def main():
     certificate_key = module.params['certificate_key']
 
     # 1. Disable swap
-    run(module, ['swapoff', '-a'])
+    run(module, ['sudo', 'swapoff', '-a'])
     run(module, ['sed', '-i.bak', '-E', r's@^([^#].*\s+swap\s+)@#\1@', '/etc/fstab'])
 
     # 2. Enable IPv4 forwarding
     sysctl_conf = '/etc/sysctl.d/k8s.conf'
     run(module, ['bash', '-c', f"echo 'net.ipv4.ip_forward = 1' > {sysctl_conf}"])
-    run(module, ['sysctl', '--system'])
+    run(module, ['sudo', 'sysctl', '--system'])
     
     # config containerd
     run(module, ['mkdir', '-p', '/etc/containerd'])
@@ -44,11 +44,11 @@ def main():
       r's/SystemdCgroup\s*=\s*false/SystemdCgroup = true/',
       '/etc/containerd/config.toml'
     ])
-    run(module, ['systemctl','restart','containerd'])
+    run(module, ['sudo', 'systemctl','restart','containerd'])
 
     # 5. Execute kubeadm join
     cmd = [
-        'kubeadm', 'join', join_endpoint,
+        'sudo', 'kubeadm', 'join', join_endpoint,
         '--token', token,
         '--discovery-token-ca-cert-hash', discovery_token_hash,
         '--certificate-key', certificate_key,
