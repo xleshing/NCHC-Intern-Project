@@ -1,5 +1,54 @@
+- name: Create all cluster VMs
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Create control-plane VMs
+      include_role:
+        name: create_vm
+      vars:
+        target_group: control_plan
+        vm_name: "control-{{ idx }}"
+      loop: "{{ range(1, control_count + 1) | list }}"
+      loop_control:
+        index_var: idx
+  
+    - name: Create master VMs
+      include_role:
+        name: create_vm
+      vars:
+        target_group: masters
+        vm_name: "master-{{ idx }}"
+      loop: "{{ range(1, master_count + 1) | list }}"
+      loop_control:
+        index_var: idx
+
+    - name: Create worker node VMs
+      include_role:
+        name: create_vm
+      vars:
+        target_group: workers
+        vm_name: "worker-{{ idx }}"
+      loop: "{{ range(1, worker_count + 1) | list }}"
+      loop_control:
+        index_var: idx
+
+    - name: Create ceph sc node VMs
+      vars:
+        target_group: ceph_server
+        vm_name: "ceph-server"
+      roles:
+        - creat_vm
+
+- name: Create LoadBalancer 
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  roles:
+    - create_lb
+
 - name: install k8s-deps (Docker, containerd, kubelet/kubeadm/kubectl)
-  hosts: control_plan,masters,nodes
+  hosts: control_plan,masters,workers
   become: true
   vars:
     ansible_become_password: "{{ secret }}"
@@ -8,14 +57,15 @@
 
 - name: Deploy Kubernetes Master and generate tokens
   hosts: control_plan
-  become: true 
+  remote_user: "{{ ssh_user }}"
+  become: true
   vars:
     ansible_become_password: "{{ secret }}"
   tasks:     
     - name: Init Kubernetes Master
       master_init:
         cluster_cidr: "{{ cluster_cidr_args }}"
-        cluster_endpoint: "{{ cluster_endpoint_args }}"
+        cluster_endpoint: "{{ hostvars[ groups['loadbalancer'][0] ].vars.ansible_host }}"
         kube_user: "{{ ansible_user }}"
       register: init_out
     - debug:
@@ -48,8 +98,8 @@
         msg: "Join output: {{ master_join_out.stdout }}"
 
 - name: Deploy Kubernetes Worker and using tokens
-  hosts: nodes                    
-  become: true                
+  hosts: workers 
+  become: true
   vars:
     ansible_become_password: "{{ secret }}"
     master_host: "{{ groups['control_plan'][0] }}"
@@ -77,6 +127,7 @@
 
 - name: install Nvidia-GPU-Operator
   hosts: control_plan
+  remote_user: "{{ ssh_user }}"
   become: true
   vars:
     ansible_become_password: "{{ secret }}"
