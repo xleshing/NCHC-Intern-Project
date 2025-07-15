@@ -2,7 +2,7 @@
   gather_facts: false
   vars_prompt:
     - name: delete_count
-      prompt: "請輸入要刪除最舊的幾台 LB？"
+      prompt: "請輸入要刪除最新的幾台 LB？"
       private: no
 
   roles:
