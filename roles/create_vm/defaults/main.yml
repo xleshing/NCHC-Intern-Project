@@ -7,12 +7,12 @@ private_network: "default_network"
 sg_name: "5352534_vm1751511071443_sg"
 ssh_user: "{{ ssh_user }}"
 new_password: "{{ secret }}"
-ssh_private_key_path: "~/.ssh/id_rsa"
 vm_name: "APItest"
 vm_desc: ""
-initial_waiting_time: 60  # 秒
-poll_interval: 30  # 秒
-poll_retries: 10    # 次
+api_timeout: 120
+initial_waiting_time: 60
+poll_interval: 30  
+poll_retries: 10  
 vm_ssh_port: 22
 ssh_interval: 10
 ssh_timeout: 300

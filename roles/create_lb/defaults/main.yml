@@ -1,5 +1,5 @@
 twcc_api_host: "openstack-taichung-default-2"
-lb_name: "{{ hostvars[ groups['control_plan'][0] ].vars.vm_name.split('_')[0]  }}"
+lb_name: "{{ hostvars[ groups[cp_target_group_name][0] ].vars.vm_name.split('_')[0]  }}"
 lb_desc: ""
 pool_protocol: "TCP"
 pool_port: "6443"
@@ -10,4 +10,4 @@ enable_pub_ip: "false"
 initial_waiting_time: 60  # 秒
 poll_interval: 30  # 秒
 poll_retries: 10    # 次
-target_group: "loadbalancer"
+target_group: "{{ endpoint_group }}"

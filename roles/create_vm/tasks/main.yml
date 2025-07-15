@@ -66,6 +66,7 @@
       solution: "{{ twcc_solution_id }}"
       name: "{{ unique_name }}"
     status_code: [200, 201]
+    timeout: "{{ api_timeout }}"
   register: create_response
 
 - name: Pause for initial provisioning
