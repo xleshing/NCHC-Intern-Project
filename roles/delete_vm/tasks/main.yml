@@ -1,7 +1,3 @@
-- name: Use provided delete_count
-  set_fact:
-    delete_count: "{{ delete_count | int }}"
-
 - name: Fetch all sites for project
   uri:
     url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/sites/?project={{ twcc_project_id }}"
@@ -11,6 +7,12 @@
       x-api-host: "{{ twcc_api_host }}"
       x-api-key: "{{ twcc_api_key }}"
   register: sites_response
+- debug:
+    msg: "Total sites: {{ sites_response.json | length }}"
+
+- name: Use provided delete_count
+  set_fact:
+    delete_count: "{{ delete_count | int }}"
 
 - name: Select oldest {{ delete_count }} site IDs
   set_fact:
