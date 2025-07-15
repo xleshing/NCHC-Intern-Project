@@ -2,6 +2,5 @@ temp.yml
 Aa@193728468426
 roles/install-nfs-provisioner/
 roles/configure-nfs-server/
-nfs-in.yml
-group_vars/all.yml/
+group_vars/all.yml
 kp1751511188256.pem 
