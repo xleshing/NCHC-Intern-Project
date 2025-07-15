@@ -1,4 +1,4 @@
-- name: Create all cluster VMs
+- name: Create all cluster VMs & Volumes
   hosts: localhost
   connection: local
   gather_facts: false
@@ -7,9 +7,9 @@
       include_role:
         name: create_vm
       vars:
-        target_group: control_plan
+        target_group: "{{ cp_target_group_name }}"
         vm_name: "control-{{ idx }}"
-      loop: "{{ range(1, control_count + 1) | list }}"
+      loop: "{{ range(control_count) | list }}"
       loop_control:
         index_var: idx
   
@@ -17,9 +17,9 @@
       include_role:
         name: create_vm
       vars:
-        target_group: masters
+        target_group: "{{ master_target_group_name }}"
         vm_name: "master-{{ idx }}"
-      loop: "{{ range(1, master_count + 1) | list }}"
+      loop: "{{ range(master_count) | list }}"
       loop_control:
         index_var: idx
 
@@ -27,18 +27,20 @@
       include_role:
         name: create_vm
       vars:
-        target_group: workers
+        target_group: "{{ worker_target_group_name }}"
         vm_name: "worker-{{ idx }}"
-      loop: "{{ range(1, worker_count + 1) | list }}"
+      loop: "{{ range(worker_count) | list }}"
       loop_control:
         index_var: idx
 
-    - name: Create ceph sc node VMs
+    - name: Create worker node Volumes
+      include_role:
+        name: create_vol
       vars:
-        target_group: ceph_server
-        vm_name: "ceph-server"
-      roles:
-        - creat_vm
+        vol_name: "{{ hostvars[ groups[worker_target_group_name][idx] ].vars.vm_name.split('_')[0]  }}"
+      loop: "{{ range(worker_count) | list }}"
+      loop_control:
+        index_var: idx
 
 - name: Create LoadBalancer 
   hosts: localhost
@@ -46,6 +48,14 @@
   gather_facts: false
   roles:
     - create_lb
+
+- name: Time synchronization
+  hosts: control_plan,masters,workers 
+  become: true
+  vars:
+    ansible_become_password: "{{ secret }}"
+  roles:
+    - install-ntp
 
 - name: install k8s-deps (Docker, containerd, kubelet/kubeadm/kubectl)
   hosts: control_plan,masters,workers
@@ -65,7 +75,7 @@
     - name: Init Kubernetes Master
       master_init:
         cluster_cidr: "{{ cluster_cidr_args }}"
-        cluster_endpoint: "{{ hostvars[ groups['loadbalancer'][0] ].vars.ansible_host }}"
+        cluster_endpoint: "{{ hostvars[ groups[endpoint_group][0] ].vars.ansible_host }}"
         kube_user: "{{ ansible_user }}"
       register: init_out
     - debug:
@@ -81,11 +91,10 @@
   become: true
   vars:
     ansible_become_password: "{{ secret }}"
-    master_host: "{{ groups['control_plan'][0] }}"
-    join_endpoint: "{{ hostvars[master_host].init_out.join_endpoint }}"
-    token: "{{ hostvars[master_host].init_out.token }}"
-    discovery_token_hash: "{{ hostvars[master_host].init_out.discovery_token_hash }}"
-    certificate_key: "{{ hostvars[master_host].init_out.certificate_key }}"
+    join_endpoint: "{{ hostvars[ groups[cp_target_group_name][0] ].init_out.join_endpoint }}"
+    token: "{{ hostvars[ groups[cp_target_group_name][0] ].init_out.token }}"
+    discovery_token_hash: "{{ hostvars[ groups[cp_target_group_name][0] ].init_out.discovery_token_hash }}"
+    certificate_key: "{{ hostvars[ groups[cp_target_group_name][0] ].init_out.certificate_key }}"
   tasks:
     - name: Join Kubernetes Master
       master_join:
@@ -98,14 +107,13 @@
         msg: "Join output: {{ master_join_out.stdout }}"
 
 - name: Deploy Kubernetes Worker and using tokens
-  hosts: workers 
+  hosts: workers
   become: true
   vars:
     ansible_become_password: "{{ secret }}"
-    master_host: "{{ groups['control_plan'][0] }}"
-    join_endpoint: "{{ hostvars[master_host].init_out.join_endpoint }}"
-    token: "{{ hostvars[master_host].init_out.token }}"
-    discovery_token_hash: "{{ hostvars[master_host].init_out.discovery_token_hash }}"
+    join_endpoint: "{{ hostvars[ groups[cp_target_group_name][0] ].init_out.join_endpoint }}"
+    token: "{{ hostvars[ groups[cp_target_group_name][0] ].init_out.token }}"
+    discovery_token_hash: "{{ hostvars[ groups[cp_target_group_name][0] ].init_out.discovery_token_hash }}"
   tasks:                                                          
     - name: Init Kubernetes Worker
       slave_init:
@@ -134,3 +142,11 @@
     kube_user: "{{ ansible_user }}"
   roles:
     - install-Nvidia-GPU-Operator
+
+- name: install Rook-Ceph
+  hosts: control_plan
+  remote_user: "{{ ssh_user }}"
+  vars:
+    kube_user: "{{ ansible_user }}"
+  roles:
+    - install-Rook-Ceph
