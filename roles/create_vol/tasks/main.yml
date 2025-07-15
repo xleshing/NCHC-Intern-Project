@@ -1,0 +1,94 @@
+- debug:
+    msg:
+      headers:
+        Content-Type: application/json
+        Accept: application/json
+        x-api-host: "{{ twcc_api_host }}"
+        x-api-key: "{{ twcc_api_key }}"
+      body_format: json
+      body:
+        name: "{{ vol_name }}vol"
+        project: "{{ twcc_project_id }}"
+        size: "{{ vol_size }}"
+        type: "{{ vol_type }}"
+
+- name: Create Volume via TWCC API
+  uri:
+    url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/volumes/"
+    method: POST
+    headers:
+      Content-Type: application/json
+      Accept: application/json
+      x-api-host: "{{ twcc_api_host }}"
+      x-api-key: "{{ twcc_api_key }}"
+    body_format: json
+    body: 
+      name: "{{ vol_name }}vol"
+      project: "{{ twcc_project_id }}"
+      size: "{{ vol_size }}"
+      type: "{{ vol_type }}"
+    status_code: [200, 201]
+  register: create_response
+
+- name: Fetch list of volumes to find Vol_ID
+  uri:
+    url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/volumes/?project={{ twcc_project_id }}"
+    method: GET
+    headers:
+      Accept: application/json
+      x-api-host: "{{ twcc_api_host }}"
+      x-api-key: "{{ twcc_api_key }}"
+  register: vol_response
+
+- name: Determine Vol_ID of created Vol
+  set_fact:
+    vol_id: >-
+      {{ (vol_response.json | selectattr('name','search', vol_name + "vol") | sort(attribute='create_time'))[-1].id }}
+
+- name: Poll until volume status is ACTIVE
+  uri:
+    url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/volumes/{{ vol_id }}/"
+    method: GET
+    headers:
+      Accept: application/json
+      x-api-host: "{{ twcc_api_host }}"
+      x-api-key: "{{ twcc_api_key }}"
+  register: status_check
+  until: "status_check.json.status | default([]) | length > 0 and status_check.json.status == 'AVAILABLE'"
+  retries: "{{ poll_retries }}"
+  delay: "{{ poll_interval }}"
+- debug:
+    msg: "Polling attempts: {{ status_check.attempts }}"
+
+- name: Fetch list of sites to find SITE_ID
+  uri:
+    url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/sites/?project={{ twcc_project_id }}"
+    method: GET
+    headers:
+      Accept: application/json
+      x-api-host: "{{ twcc_api_host }}"
+      x-api-key: "{{ twcc_api_key }}"
+  register: sites_response
+
+- name: Search SITE_ID
+  set_fact:
+    site_id: >-
+      {{ (sites_response.json | selectattr('name','search', vol_name) | sort(attribute='create_time'))[-1].servers[server_idx].id }}
+- debug:
+    msg:
+      "{{ site_id }}"
+
+- name: Upd volume (attach vm) 
+  uri:
+    url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/volumes/{{ vol_id }}/action/"
+    method: PUT
+    headers:
+      Accept: application/json
+      x-api-host: "{{ twcc_api_host }}"
+      x-api-key: "{{ twcc_api_key }}"
+    body_format: json
+    body:
+      server: "{{ site_id }}"
+      status: "attach"
+    status_code: [200, 201]
+  register: status_check

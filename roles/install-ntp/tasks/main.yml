@@ -1,0 +1,26 @@
+- name: 安装 NTP 软件包
+  ansible.builtin.package:
+    name: ntp
+    state: present
+
+- name: 配置 /etc/ntp.conf
+  ansible.builtin.template:
+    src: ntp.conf.j2
+    dest: /etc/ntp.conf
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: 启用并启动 ntp 服务
+  ansible.builtin.service:
+    name: ntp
+    state: started
+    enabled: yes
+
+- name: 检查 ntp 同步状态
+  ansible.builtin.command: ntpq -p
+  register: ntpq_output
+
+- name: 打印 ntp 同步状态
+  ansible.builtin.debug:
+    var: ntpq_output.stdout

@@ -1,0 +1,9 @@
+driftfile {{ ntp_driftfile }}
+
+{% for server in ntp_servers %}
+server {{ server }}
+{% endfor %}
+
+restrict default kod nomodify notrap nopeer noquery
+restrict 127.0.0.1
+restrict ::1

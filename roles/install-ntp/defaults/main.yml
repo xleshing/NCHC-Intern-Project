@@ -1,0 +1,5 @@
+ntp_driftfile: "/var/lib/ntp/ntp.drift"
+ntp_servers:
+  - "ntp1.aliyun.com iburst"
+  - "ntp2.aliyun.com iburst"
+  - "ntp3.aliyun.com iburst"

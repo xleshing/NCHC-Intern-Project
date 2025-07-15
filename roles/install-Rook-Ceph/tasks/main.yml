@@ -1,0 +1,32 @@
+- name: Clone Rook repository
+  ansible.builtin.git:
+    repo: "{{ rook_repo_url }}"
+    version: "{{ rook_repo_version }}"
+    dest: "{{ rook_repo_dest }}"
+    force: yes
+
+- name: Deploy Rook CRDs, Common, and Operator
+  ansible.builtin.command:
+    cmd: >-
+      kubectl create -f crds.yaml -f common.yaml -f operator.yaml
+    chdir: "{{ rook_repo_dest }}/deploy/examples"
+
+- name: Deploy CephCluster
+  ansible.builtin.command:
+    cmd: kubectl create -f cluster.yaml
+    chdir: "{{ rook_repo_dest }}/deploy/examples"
+
+- name: Deploy RBD StorageClass
+  ansible.builtin.command:
+    cmd: kubectl -n rook-ceph create -f csi/rbd/storageclass.yaml
+    chdir: "{{ rook_repo_dest }}/deploy/examples"
+
+- name: Deploy CephFilesystem CR
+  ansible.builtin.command:
+    cmd: kubectl -n rook-ceph create -f filesystem.yaml
+    chdir: "{{ rook_repo_dest }}/deploy/examples"
+
+- name: Deploy CephFS StorageClass
+  ansible.builtin.command:
+    cmd: kubectl -n rook-ceph create -f csi/cephfs/storageclass.yaml
+    chdir: "{{ rook_repo_dest }}/deploy/examples"
