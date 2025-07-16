@@ -143,25 +143,25 @@
 
 ---
 
-> <a id="control_count"></a>
+<a id="control_count"></a>
 > 1. 這裡由 `control_count` 所創建的 `control-plan` 指的是能夠使用 kubectl command 的主機並且初始 `kubeadm init` 指令也是在此主機上執行，其餘與 masters group 內的主機一樣。
-> <a id="endpoint_group"></a>
+<a id="endpoint_group"></a>
 > 2. 此參數會創建一個群組拿來存 `control-plane-endpoint` 並把該群組的第一個 `IP:Port` 傳給 `kubeadm init --control-plane-endpoint`。
-> <a id="target_group_name"></a>
+<a id="target_group_name"></a>
 > 3. 此參數如需更動，也需手動更改 `k8s.yml` 內的 `hosts` 參數
-> <a id="創建VM"></a>
+<a id="創建VM"></a>
 > 4. 所有創建的 VM 會共用此設定檔內的參數。
-> <a id="ssh_user"></a>
+<a id="ssh_user"></a>
 > 5. 除創建相關腳本外 ( 部署 cilium 或部署 ceph 之類的 ) 的腳本，ssh登錄名之參數為 `kube_user` ，其由 k8s.yml 內的 `ansible_user` 傳遞並繼承全域參數 `ssh_user` 。 
-> <a id="vm_name"></a>
+<a id="vm_name"></a>
 > 6. `vm_name` 會是以 `<timestamp>_<control/master/worker>-<idx>` 的形式表示。
-> <a id="init_command"></a>
+<a id="init_command"></a>
 > 7. 預設指令為 `sed -i '1iaccount sufficient pam_permit.so' /etc/pam.d/common-account  && echo "{{ ssh_user }}:{{ new_password }}" | chpasswd && printf "{{ ssh_user }} ALL=(ALL) NOPASSWD:ALL\n" >/etc/sudoers.d/{{ ssh_user }} && chmod 440 /etc/sudoers.d/{{ ssh_user }}` 此指令會在 `/etc/pam.d/common-account` 的第一行加上 `account sufficient pam_permit.so` 這會讓 `pam_permit.so` 總是返回允許從而讓該文件內所有帳戶都不會因帳戶到期而被 PAM 拒絕
-> <a id="創建Vol"></a>
+<a id="創建Vol"></a>
 > 8. 所有創建的 Vol 會共用此設定檔內的參數且每個 worker 都會有一個自己的 Vol。
-> <a id="vol_name"></a>
+<a id="vol_name"></a>
 > 9. `vol_name` 會從 worker VM 名取得前綴 ( <timestamp><"vol"> )，但因需要迭代 worker idx 所以放在 `k8s.yml` 中設定。 
-> <a id="server_idx"></a>
+<a id="server_idx"></a>
 > 10. 目前看每個 VM 只有一個，但其回傳的 `Response.Servers` 結構為 `list` ，以防萬一用 `idx` 來指定。
 
 ## 使用方法
