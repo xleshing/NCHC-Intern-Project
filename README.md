@@ -148,7 +148,7 @@
 <a id="endpoint_group"></a>
 > 2. 此參數會創建一個群組拿來存 `control-plane-endpoint` 並把該群組的第一個 `IP:Port` 傳給 `kubeadm init --control-plane-endpoint`。
 <a id="target_group_name"></a>
-> 3. 此參數如需更動，也需手動更改 `k8s.yml` 內的 `hosts` 參數
+> 3. 此參數如需更動，也需手動更改 `k8s.yml` 內的 `hosts` 參數。
 <a id="creatvm"></a>
 > 4. 所有創建的 VM 會共用此設定檔內的參數。
 <a id="ssh_user"></a>
@@ -156,7 +156,7 @@
 <a id="vm_name"></a>
 > 6. `vm_name` 會是以 `<timestamp>_<control/master/worker>-<idx>` 的形式表示。
 <a id="init_command"></a>
-> 7. 預設指令為 `sed -i '1iaccount sufficient pam_permit.so' /etc/pam.d/common-account  && echo "{{ ssh_user }}:{{ new_password }}" | chpasswd && printf "{{ ssh_user }} ALL=(ALL) NOPASSWD:ALL\n" >/etc/sudoers.d/{{ ssh_user }} && chmod 440 /etc/sudoers.d/{{ ssh_user }}` 此指令會在 `/etc/pam.d/common-account` 的第一行加上 `account sufficient pam_permit.so` 這會讓 `pam_permit.so` 總是返回允許從而讓該文件內所有帳戶都不會因帳戶到期而被 PAM 拒絕
+> 7. 預設指令為 `sed -i '1iaccount sufficient pam_permit.so' /etc/pam.d/common-account  && echo "{{ ssh_user }}:{{ new_password }}" | chpasswd && printf "{{ ssh_user }} ALL=(ALL) NOPASSWD:ALL\n" >/etc/sudoers.d/{{ ssh_user }} && chmod 440 /etc/sudoers.d/{{ ssh_user }}` 此指令會在 `/etc/pam.d/common-account` 的第一行加上 `account sufficient pam_permit.so` ***這會讓 `pam_permit.so` 總是返回允許從而讓該文件內所有帳戶都不會因帳戶到期而被 PAM 拒絕***。
 <a id="creatvol"></a>
 > 8. 所有創建的 Vol 會共用此設定檔內的參數且每個 worker 都會有一個自己的 Vol。
 <a id="vol_name"></a>
