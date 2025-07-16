@@ -125,7 +125,7 @@
     timeout: "{{ ssh_timeout }}"
     state: started
 
-- name: 把這台 VM 加到 inventory
+- name: add VM to inventory
   add_host:
     name: "{{ server_info.json[0].private_nets[0].ip }}"
     groups: "{{ target_group }}"

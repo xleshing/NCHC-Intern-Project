@@ -121,7 +121,7 @@
   set_fact:
     lb_ip: "{{ status_check.json.private_ip }}"
 
-- name: 把 LB 加到 inventory
+- name: add LB to inventory
   add_host:
     name: "{{ status_check.json.private_ip }}:{{ pool_port }}"
     groups: "{{ target_group }}"
