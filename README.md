@@ -57,7 +57,7 @@
 | `new_password`         | SSH 用戶密碼 (繼承自全域 `secret`)。       | `{{ secret }}`                 |
 | `vm_name`<sup>[*6*](#vm_name)</sup>              | VM 基本名稱。                         |                       |
 | `vm_desc`              | VM 描述。                           | \`\`                           |
-| `api_timeout`          | TWCC API 呼叫超時 (秒)。               | `60`                           |
+| `api_timeout`          | TWCC API 呼叫超時 (秒)。               | `600`                           |
 | `initial_waiting_time` | VM 建立後初始等待 (秒)。                  | `60`                           |
 | `poll_interval`        | VM 狀態輪詢間隔 (秒)。                   | `30`                           |
 | `poll_retries`         | VM 狀態輪詢重試次數。                     | `10`                           |
@@ -75,6 +75,7 @@
 | `twcc_api_host`        | TWCC API 主機名稱。            | `openstack-taichung-default-2` |
 | `vol_name`<sup>[*9*](#vol_name)</sup>              | Volume 名稱，從 worker VMs 名取得前綴。          | 動態計算
 | `server_idx`<sup>[*10*](#server_idx)</sup>           | 要掛載 volume 的 VM 索引 (0 起)。 | `0`                            |
+| `api_timeout`          | TWCC API 呼叫超時 (秒)。               | `600`                           |
 | `initial_waiting_time` | 建立後初始等待 (秒)。              | `60`                           |
 | `poll_interval`        | 狀態輪詢間隔 (秒)。               | `30`                           |
 | `poll_retries`         | 狀態輪詢重試次數。                 | `10`                           |
@@ -92,6 +93,7 @@
 | `method`               | 負載演算法 (ROUND\_ROBIN/LEAST\_CONNECTIONS/SOURCE\_IP)。 | `ROUND_ROBIN`                  |
 | `private_ip_name`      | 私有網路名稱，對應 TWCC 回傳的 network name。                    | `default_network`              |
 | `enable_pub_ip`        | 是否分配公網浮動 IP (boolean)。                              | `false`                        |
+| `api_timeout`          | TWCC API 呼叫超時 (秒)。               | `600`                           |
 | `initial_waiting_time` | 建立後初始等待 (秒)。                                        | `60`                           |
 | `poll_interval`        | 狀態輪詢間隔 (秒)。                                         | `30`                           |
 | `poll_retries`         | 狀態輪詢重試次數。                                           | `10`                           |
