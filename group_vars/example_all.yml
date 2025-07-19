@@ -1,15 +1,128 @@
+# ── 全域參數 ───────────────────────────────────────────────────────────
 ssh_user: "ubuntu"
-secret: ""
-twcc_project_id: ""
-twcc_solution_id: ""
-twcc_api_key: ""
+secret: 
+twcc_project_id: 
+twcc_solution_id: 
+twcc_api_key: 
+
 control_count: 1
 master_count: 2
-worker_count: 3
-cluster_cidr_args: 10.0.0.0/16
-endpoint_group: "loadbalancer"
-vol_size: "100"
-vol_type: "hdd"
-cp_target_group_name: "control_plan" 
+
+ceph_control_count: 1
+ceph_master_count: 2
+ceph_worker_count: 3
+
+volume_count: 3
+
+cluster_cidr_args: "10.0.0.0/16"
+endpoint_target_group_name: "loadbalancer"
+
+ceph_cluster_cidr_args: "10.0.0.0/16"
+ceph_endpoint_target_group_name: "ceph_loadbalancer"
+
+cp_target_group_name: "control_plan"
 master_target_group_name: "masters"
-worker_target_group_name: "workers" 
+worker_target_group_name: "workers"
+
+ceph_cp_target_group_name: "ceph_control_plan"
+ceph_master_target_group_name: "ceph_masters"
+ceph_worker_target_group_name: "ceph_workers"
+ceph_provider_target_group_name: "ceph_provider"
+# ── create_vm Role 參數 ─────────────────────────────────────────────────
+create_vm:
+  twcc_api_host: "openstack-taichung-default-2"
+  key_pair_name: 
+  cp_flavor: "v.xsuper"
+  master_flavor: "v.xsuper"
+
+  ceph_cp_flavor: "v.xsuper"
+  ceph_master_flavor: "v.xsuper"
+  ceph_worker_flavor: "v.xsuper"
+  
+  flavor_counts:
+    v.super: 1
+    v.xsuper: 0
+    v.2xsuper: 0
+    v.4xsuper: 0
+    v.8xsuper: 1
+    vgv.xsuper: 0
+    vgv.xsuper(水冷): 0
+    vgv.2xsuper: 0
+    vgv.2xsuper(水冷): 0
+    vgv.4xsuper: 0
+    vgv.4xsuper(水冷): 0
+    vgv.8xsuper: 0
+    vgv.8xsuper(水冷): 0
+  volume_size: 200
+  volume_type: "block_storage-hdd"
+  private_network: "default_network"
+  sg_name: 
+  vm_desc: ""
+  api_timeout: 600
+  initial_waiting_time: 60
+  poll_interval: 30
+  poll_retries: 10
+  vm_ssh_port: 22
+  ssh_interval: 10
+  ssh_timeout: 300
+  ubuntu_version: "Ubuntu-22.04"
+  init_command: sed -i '1iaccount sufficient pam_permit.so' /etc/pam.d/common-account  && echo "{{ ssh_user }}:{{ secret }}" | chpasswd && printf "{{ ssh_user }} ALL=(ALL) NOPASSWD:ALL\n" >/etc/sudoers.d/{{ ssh_user }} && chmod 440 /etc/sudoers.d/{{ ssh_user }}
+
+ 
+# ── create_vol Role 參數 ─────────────────────────────────────────────────
+create_vol:
+  twcc_api_host: "openstack-taichung-default-2"
+  server_idx: 0
+  api_timeout: 600
+  initial_waiting_time: 60
+  poll_interval: 30
+  poll_retries: 10
+  vol_size: 100
+  vol_type: "hdd"
+
+# ── create_lb Role 參數 ──────────────────────────────────────────────────
+create_lb:
+  twcc_api_host: "openstack-taichung-default-2"
+  lb_desc: ""
+  pool_protocol: "TCP"
+  pool_port: 6443
+  members_port: 6443
+  method: "ROUND_ROBIN"
+  private_ip_name: "default_network"
+  enable_pub_ip: false
+  api_timeout: 600
+  initial_waiting_time: 60
+  poll_interval: 30
+  poll_retries: 10
+
+# ── install-cilium Role 參數 ───────────────────────────────────────────────
+install_cilium:
+  cilium_version: "1.17.5"
+
+# ── install-ntp Role 參數 ────────────────────────────────────────────────
+install_ntp:
+  ntp_driftfile: "/var/lib/ntp/ntp.drift"
+  ntp_servers:
+    - "ntp1.aliyun.com iburst"
+    - "ntp2.aliyun.com iburst"
+    - "ntp3.aliyun.com iburst"
+
+# ── install-Nvidia-GPU-Operator Role 參數 ─────────────────────────────────
+install_Nvidia_GPU_Operator:
+  helm_get_url: "https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3"
+  helm_script: "get_helm.sh"
+  nvidia_repo_name: "nvidia"
+  nvidia_repo_url: "https://helm.ngc.nvidia.com/nvidia"
+  gpu_operator_namespace: "gpu-operator"
+  gpu_operator_chart: "nvidia/gpu-operator"
+  gpu_operator_version: "v25.3.1"
+
+# ── install-Rook-Ceph Role 參數 ───────────────────────────────────────────
+install_Rook_Ceph:
+  rook_repo_url: "https://github.com/rook/rook.git"
+  rook_repo_version: "v1.17.6"
+  rook_repo_dest: "/home/{{ ssh_user }}/rook"
+  wait_etcd_timeout: 15
+  wait_toolbox_timeout: 300
+  wait_retries: 20
+  wait_delay: 15
