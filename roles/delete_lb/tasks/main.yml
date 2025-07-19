@@ -7,21 +7,23 @@
       x-api-host: "{{ twcc_api_host }}"
       x-api-key: "{{ twcc_api_key }}"
   register: lb_response
-- debug:
-    msg: "Total LBs: {{ lb_response.json | length }}"
 
-- name: Use provided delete_count
+- name: Ensure delete_start/end are integers
   set_fact:
-    delete_count: "{{ delete_count | int }}"
+    delete_start: "{{ delete_start | int }}"
+    delete_end:   "{{ delete_end   | int }}"
+  set_fact:
+    delete_start: "{{ delete_start | int }}"
+    delete_end:   "{{ delete_end   | int }}"
 
-- name: Select oldest {{ delete_count }} lb IDs
+- name: Select lb IDs
   set_fact:
     lb_ids_to_delete: >-
       {{ (lb_response.json
         | sort(attribute='create_time')
         | reverse
         | map(attribute='id')
-        | list)[:(delete_count | int )] }}
+        | list)[(delete_start | int):(delete_end | int)] }}
 
 - name: Confirm deletion of lb_ids
   pause:
@@ -35,6 +37,7 @@
       x-api-host: "{{ twcc_api_host }}"
       x-api-key: "{{ twcc_api_key }}"
     status_code: [200,204]
+    timeout: 600
   loop: "{{ lb_ids_to_delete }}"
   loop_control:
     label: "{{ item }}"

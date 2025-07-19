@@ -7,25 +7,25 @@
       x-api-host: "{{ twcc_api_host }}"
       x-api-key: "{{ twcc_api_key }}"
   register: vol_response
-- debug:
-    msg: "Total vols: {{ vol_response.json | length }}"
 
-- name: Use provided delete_count
+- name: Ensure delete_start/end are integers
   set_fact:
     delete_count: "{{ delete_count | int }}"
 
-- name: Select oldest {{ delete_count }} vol IDs
+- name: Select vol IDs
   set_fact:
     vol_ids_to_delete: >-
       {{ (vol_response.json
+        | selectattr('is_bootable', 'equalto', false)
+        | selectattr('status', 'equalto', 'AVAILABLE')
         | sort(attribute='create_time')
         | reverse
         | map(attribute='id')
-        | list)[:(delete_count | int )] }}
+        | list)[:(delete_count | int)] }}
 
 - name: Confirm deletion of vol_ids
   pause:
-    prompt: "即將刪除以下 Vol IDs: {{ vol_ids_to_delete }}，按 Enter 繼續，Ctrl+C 取消"
+    prompt: "delete Vol IDs: {{ vol_ids_to_delete }}"
 
 - name: Delete selected Vols
   uri:
@@ -35,6 +35,7 @@
       x-api-host: "{{ twcc_api_host }}"
       x-api-key: "{{ twcc_api_key }}"
     status_code: [200,204]
+    timeout: 600
   loop: "{{ vol_ids_to_delete }}"
   loop_control:
     label: "{{ item }}"

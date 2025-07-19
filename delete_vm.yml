@@ -1,9 +1,26 @@
 - hosts: local
   gather_facts: false
-  vars_prompt:
-    - name: delete_count
-      prompt: "請輸入要刪除最新的幾台 VM？"
-      private: no
+  tasks:
+    - name: Fetch all sites for project
+      uri:
+        url: "https://apigateway.twcc.ai/api/v3/{{ create_vm.twcc_api_host }}/sites/?project={{ twcc_project_id }}"
+        method: GET
+        headers:
+          Accept: application/json
+          x-api-host: "{{ create_vm.twcc_api_host }}"
+          x-api-key: "{{ twcc_api_key }}"
+      register: sites_response
+    - debug:
+        msg: "Total sites: {{ sites_response.json | length }}"
 
+- hosts: local
+  gather_facts: false
+  vars_prompt:
+    - name: delete_start
+      prompt: "delete_start？"
+      private: no
+    - name: delete_end
+      prompt: "delete_end？"
+      private: no
   roles:
     - delete_vm

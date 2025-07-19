@@ -1,9 +1,27 @@
 - hosts: local
   gather_facts: false
+  tasks:
+    - name: Fetch all vol for project
+      uri:
+        url: "https://apigateway.twcc.ai/api/v3/{{ create_vol.twcc_api_host }}/volumes/?project={{ twcc_project_id }}"
+        method: GET
+        headers:
+          Accept: application/json
+          x-api-host: "{{ create_vol.twcc_api_host }}"
+          x-api-key: "{{ twcc_api_key }}"
+      register: vol_response
+    - debug:
+        msg: "Total volumes: 
+            {{ vol_response.json
+            | selectattr('is_bootable', 'equalto', false) 
+            | selectattr('status', 'equalto', 'AVAILABLE') 
+            | length }}"
+
+- hosts: local
+  gather_facts: false
   vars_prompt:
     - name: delete_count
-      prompt: "請輸入要刪除最新的幾台 Vol？"
+      prompt: "delete_count？"
       private: no
-
   roles:
     - delete_vol
