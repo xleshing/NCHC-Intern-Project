@@ -5,7 +5,7 @@
 - name: add control_plan + masters to pool_members_list
   set_fact:
     pool_members: "{{ pool_members + [ { 'ip': hostvars[item].vars.ansible_host, 'port': members_port } ] }}"
-  loop: "{{ (groups['control_plan'] | default([])) + (groups['masters'] | default([])) }}"
+  loop: "{{ (groups[cp_pool_target_group_name] | default([])) + (groups[master_pool_target_group_name] | default([])) }}"
   loop_control:
     loop_var: item
 
@@ -14,9 +14,9 @@
     url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/networks/?project={{ twcc_project_id }}"
     method: GET
     headers:
-      Accept:        "application/json"
-      x-api-host:    "{{ twcc_api_host }}"
-      x-api-key:     "{{ twcc_api_key }}"
+      Accept: "application/json"
+      x-api-host: "{{ twcc_api_host }}"
+      x-api-key: "{{ twcc_api_key }}"
     return_content: yes
   register: network_list  
 
@@ -81,6 +81,7 @@
           protocol: "{{ pool_protocol }}"
           protocol_port: "{{ pool_port }}"
     status_code: [200, 201]
+    timeout: "{{ api_timeout }}"
   register: create_response
 
 - name: Pause for initial provisioning
