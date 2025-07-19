@@ -1,4 +1,4 @@
-- name: Create all cluster VMs & Volumes
+- name: Create all cluster VMs
   hosts: localhost
   connection: local
   gather_facts: false
@@ -8,6 +8,7 @@
         name: create_vm
       vars:
         target_group: "{{ cp_target_group_name }}"
+        flavor: "{{ create_vm.cp_flavor }}"
         vm_name: "control-{{ idx }}"
       loop: "{{ range(control_count) | list }}"
       loop_control:
@@ -18,39 +19,117 @@
         name: create_vm
       vars:
         target_group: "{{ master_target_group_name }}"
+        flavor: "{{ create_vm.master_flavor }}"
         vm_name: "master-{{ idx }}"
       loop: "{{ range(master_count) | list }}"
       loop_control:
         index_var: idx
 
-    - name: Create worker node VMs
+    - name: init worker_flavors
+      set_fact:
+        worker_flavors: []
+
+    - name: flatten flavor_counts
+      set_fact:
+        worker_flavors: "{{ worker_flavors + ([ item.key ] * (item.value | int)) }}"
+      loop: "{{ create_vm.flavor_counts | dict2items }}"
+      when: item.value | int > 0
+    - debug:
+        msg: "{{ worker_flavors }}"
+
+    - name: Create worker VMs
       include_role:
         name: create_vm
       vars:
         target_group: "{{ worker_target_group_name }}"
-        vm_name: "worker-{{ idx }}"
-      loop: "{{ range(worker_count) | list }}"
+        flavor: "{{ item }}"
+        vm_name: "{{ item }}-worker-{{ idx }}"
+      loop: "{{ worker_flavors }}"
       loop_control:
         index_var: idx
 
-    - name: Create worker node Volumes
-      include_role:
-        name: create_vol
-      vars:
-        vol_name: "{{ hostvars[ groups[worker_target_group_name][idx] ].vars.vm_name.split('_')[0]  }}"
-      loop: "{{ range(worker_count) | list }}"
-      loop_control:
-        index_var: idx
-
-- name: Create LoadBalancer 
+- name: Create LoadBalancer
   hosts: localhost
   connection: local
   gather_facts: false
+  vars:
+    lb_name: "{{ hostvars[ groups[cp_target_group_name][0] ].vars.vm_name.split('_')[0] }}"
+    cp_pool_target_group_name: "{{ cp_target_group_name }}"
+    master_pool_target_group_name: "{{ master_target_group_name }}"
+    target_group: "{{ endpoint_target_group_name }}"
   roles:
     - create_lb
 
+# ── create_ceph_cluster_start ──────────────────────────────────────
+
+- name: Create all ceph_cluster VMs
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Create ceph_control-plane VMs
+      include_role:
+        name: create_vm
+      vars:
+        target_group: "{{ ceph_cp_target_group_name }}"
+        flavor: "{{ create_vm.ceph_cp_flavor }}"
+        vm_name: "ceph_control-{{ idx }}"
+      loop: "{{ range(ceph_control_count) | list }}"
+      loop_control:
+        index_var: idx
+
+    - name: Create ceph_master VMs
+      include_role:
+        name: create_vm
+      vars:
+        target_group: "{{ ceph_master_target_group_name }}"
+        flavor: "{{ create_vm.ceph_master_flavor }}"
+        vm_name: "ceph_master-{{ idx }}"
+      loop: "{{ range(ceph_master_count) | list }}"
+      loop_control:
+        index_var: idx
+
+    - name: Create ceph_worker VMs
+      include_role:
+        name: create_vm
+      vars:
+        target_group: "{{ ceph_worker_target_group_name }}"
+        flavor: "{{ create_vm.ceph_worker_flavor }}"
+        vm_name: "ceph_worker-{{ idx }}"
+      loop: "{{ range(ceph_worker_count) | list }}"
+      loop_control:
+        index_var: idx
+
+- name: Create ceph node Volumes
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Create ceph node Volumes
+      include_role:
+        name: create_vol
+      vars:
+        vol_name: "{{ hostvars[ groups[ceph_worker_target_group_name][idx] ].vars.vm_name.split('_')[0]  }}"
+      loop: "{{ range(volume_count) | list }}"
+      loop_control:
+        index_var: idx
+
+- name: Create ceph_LoadBalancer
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    lb_name: "{{ hostvars[ groups[ceph_cp_target_group_name][0] ].vars.vm_name.split('_')[0] }}"
+    cp_pool_target_group_name: "{{ ceph_cp_target_group_name }}"
+    master_pool_target_group_name: "{{ ceph_master_target_group_name }}"
+    target_group: "{{ ceph_endpoint_target_group_name }}"
+  roles:
+    - create_lb
+
+# ── create_ceph_cluster_complet ────────────────────────────────────
+
 - name: Time synchronization
-  hosts: control_plan,masters,workers 
+  hosts: control_plan,masters,workers,ceph_control_plan,ceph_masters,ceph_workers 
   become: true
   vars:
     ansible_become_password: "{{ secret }}"
@@ -58,7 +137,7 @@
     - install-ntp
 
 - name: install k8s-deps (Docker, containerd, kubelet/kubeadm/kubectl)
-  hosts: control_plan,masters,workers
+  hosts: control_plan,masters,workers,ceph_control_plan,ceph_masters,ceph_workers
   become: true
   vars:
     ansible_become_password: "{{ secret }}"
@@ -75,7 +154,7 @@
     - name: Init Kubernetes Master
       master_init:
         cluster_cidr: "{{ cluster_cidr_args }}"
-        cluster_endpoint: "{{ hostvars[ groups[endpoint_group][0] ].vars.ansible_host }}"
+        cluster_endpoint: "{{ hostvars[ groups[endpoint_target_group_name][0] ].vars.ansible_host }}"
         kube_user: "{{ ansible_user }}"
       register: init_out
     - debug:
@@ -133,6 +212,95 @@
   roles:
     - install-cilium
 
+# ── deploy_ceph_cluster_start ──────────────────────────────────────
+
+- name: Deploy ceph_Kubernetes Master and generate tokens
+  hosts: ceph_control_plan
+  remote_user: "{{ ssh_user }}"
+  become: true
+  vars:
+    ansible_become_password: "{{ secret }}"
+  tasks:
+    - name: Init ceph_Kubernetes Master
+      master_init:
+        cluster_cidr: "{{ ceph_cluster_cidr_args }}"
+        cluster_endpoint: "{{ hostvars[ groups[ceph_endpoint_target_group_name][0] ].vars.ansible_host }}"
+        kube_user: "{{ ansible_user }}"
+      register: ceph_init_out
+    - debug:
+        msg:
+          - "cluster_cidr: {{ ceph_cluster_cidr_args }}"
+          - "join_endpoint: {{ ceph_init_out.join_endpoint }}"
+          - "token: {{ ceph_init_out.token }}"
+          - "discovery_token_hash: {{ ceph_init_out.discovery_token_hash }}"
+          - "certificate_key: {{ ceph_init_out.certificate_key }}"
+
+- name: Join ceph_Kubernetes Master
+  hosts: ceph_masters
+  become: true
+  vars:
+    ansible_become_password: "{{ secret }}"
+    join_endpoint: "{{ hostvars[ groups[ceph_cp_target_group_name][0] ].ceph_init_out.join_endpoint }}"
+    token: "{{ hostvars[ groups[ceph_cp_target_group_name][0] ].ceph_init_out.token }}"
+    discovery_token_hash: "{{ hostvars[ groups[ceph_cp_target_group_name][0] ].ceph_init_out.discovery_token_hash }}"
+    certificate_key: "{{ hostvars[ groups[ceph_cp_target_group_name][0] ].ceph_init_out.certificate_key }}"
+  tasks:
+    - name: Join ceph_Kubernetes Master
+      master_join:
+        join_endpoint: "{{ join_endpoint }}"
+        token: "{{ token }}"
+        discovery_token_hash: "{{ discovery_token_hash }}"
+        certificate_key: "{{ certificate_key }}"
+      register: ceph_master_join_out
+    - debug:
+        msg: "Join output: {{ ceph_master_join_out.stdout }}"
+
+- name: Deploy ceph_Kubernetes Worker and using tokens
+  hosts: ceph_workers
+  become: true
+  vars:
+    ansible_become_password: "{{ secret }}"
+    join_endpoint: "{{ hostvars[ groups[ceph_cp_target_group_name][0] ].ceph_init_out.join_endpoint }}"
+    token: "{{ hostvars[ groups[ceph_cp_target_group_name][0] ].ceph_init_out.token }}"
+    discovery_token_hash: "{{ hostvars[ groups[ceph_cp_target_group_name][0] ].ceph_init_out.discovery_token_hash }}"
+  tasks:
+    - name: Init ceph_Kubernetes Worker
+      slave_init:
+        join_endpoint: "{{ join_endpoint }}"
+        token: "{{ token }}"
+        discovery_token_hash: "{{ discovery_token_hash }}"
+      register: ceph_join_out
+    - debug:
+        msg: "Join output: {{ ceph_join_out.stdout }}"
+
+- name: install ceph_Cilium
+  hosts: ceph_control_plan
+  become: true
+  vars:
+    ansible_become_password: "{{ secret }}"
+    cilium_cluster_cidr: "{{ ceph_cluster_cidr_args }}"
+  roles:
+    - install-cilium
+
+- name: install Rook-Ceph-provider
+  hosts: ceph_control_plan
+  remote_user: "{{ ssh_user }}"
+  vars:
+    kube_user: "{{ ansible_user }}"
+  roles:
+    - install-Rook-Ceph-provider
+
+# ── deploy_ceph_cluster_complet ────────────────────────────────────
+
+- name: install Rook-Ceph-consumer
+  hosts: control_plan
+  remote_user: "{{ ssh_user }}"
+  vars:
+    kube_user: "{{ ansible_user }}"
+    rook_ceph_env: "{{ hostvars[ groups[ceph_provider_target_group_name][0] ].vars.rook_ceph_env }}"
+  roles:
+    - install-Rook-Ceph-consumer
+
 - name: install Nvidia-GPU-Operator
   hosts: control_plan
   remote_user: "{{ ssh_user }}"
@@ -143,10 +311,3 @@
   roles:
     - install-Nvidia-GPU-Operator
 
-- name: install Rook-Ceph
-  hosts: control_plan
-  remote_user: "{{ ssh_user }}"
-  vars:
-    kube_user: "{{ ansible_user }}"
-  roles:
-    - install-Rook-Ceph
