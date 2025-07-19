@@ -1,3 +1,0 @@
-rook_repo_url: "https://github.com/rook/rook.git"
-rook_repo_version: "v1.17.6"
-rook_repo_dest: "/home/{{ kube_user }}/rook"

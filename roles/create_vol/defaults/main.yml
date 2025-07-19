@@ -1,5 +1,9 @@
-twcc_api_host: "openstack-taichung-default-2"
-server_idx: 0
-initial_waiting_time: 60  # 秒
-poll_interval: 30  # 秒
-poll_retries: 10    # 次
+twcc_api_host: "{{ create_vol.twcc_api_host }}"
+server_idx: "{{ create_vol.server_idx }}"
+api_timeout: "{{ create_vol.api_timeout }}"
+initial_waiting_time: "{{ create_vol.initial_waiting_time }}"
+poll_interval: "{{ create_vol.poll_interval }}"
+poll_retries: "{{ create_vol.poll_retries }}"
+vol_size: "{{ create_vol.vol_size }}"
+vol_type: "{{ create_vol.vol_type }}"
+

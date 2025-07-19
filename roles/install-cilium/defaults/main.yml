@@ -1,1 +1,1 @@
-cilium_version: "1.17.5"
+cilium_version: "{{ install_cilium.cilium_version }}"
