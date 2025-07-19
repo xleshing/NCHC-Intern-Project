@@ -1,0 +1,4 @@
+rook_repo_url: "{{ install_Rook_Ceph.rook_repo_url }}"
+rook_repo_version: "{{ install_Rook_Ceph.rook_repo_version }}"
+rook_repo_dest: "{{ install_Rook_Ceph.rook_repo_dest }}"
+wait_etcd_timeout: "{{ install_Rook_Ceph.wait_etcd_timeout }}"

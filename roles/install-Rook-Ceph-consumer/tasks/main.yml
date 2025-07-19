@@ -1,0 +1,74 @@
+- name: Clone Rook repository
+  ansible.builtin.git:
+    repo: "{{ rook_repo_url }}"
+    version: "{{ rook_repo_version }}"
+    dest: "{{ rook_repo_dest }}"
+    force: yes
+
+- name: deploy Rook CRDs
+  shell: kubectl create -f crds.yaml
+  args:
+    chdir: "{{ rook_repo_dest }}/deploy/examples"
+  register: out_crds
+  failed_when: out_crds.rc not in [0,1]
+- debug:
+    msg: "{{ out_crds }}"
+
+- name: wait etcd
+  pause:
+    seconds: "{{ wait_etcd_timeout }}"
+
+- name: deploy Rook Common
+  shell: kubectl create -f common.yaml
+  args:
+    chdir: "{{ rook_repo_dest }}/deploy/examples"
+  register: out_common
+  failed_when: out_common.rc not in [0,1]
+- debug:
+    msg: "{{ out_common }}"
+
+- name: wait etcd
+  pause:
+    seconds: "{{ wait_etcd_timeout }}"
+
+- name: deploy Rook Operator
+  shell: kubectl create -f operator.yaml
+  args:
+    chdir: "{{ rook_repo_dest }}/deploy/examples"
+  register: out_operator
+  failed_when: out_operator.rc not in [0,1]
+- debug:
+    msg: "{{ out_operator }}"
+
+- name: wait etcd
+  pause:
+    seconds: "{{ wait_etcd_timeout }}"
+  # create/apply
+- name: Deploy Rook Common-external, and Cluster-external
+  shell: kubectl create -f common-external.yaml -f cluster-external.yaml
+  args:  
+    chdir: "{{ rook_repo_dest }}/deploy/examples/external"
+  register: out_external
+  failed_when: out_external.rc not in [0,1]
+- debug:
+    msg: "{{ out_external }}"
+
+- name: make Ceph env file
+  template:
+    src: rook_ceph_env.sh.j2
+    dest: /tmp/rook_ceph_env.sh
+    mode: '0755'
+
+- name: chmod +x import-external-cluster.sh
+  file:
+    path: "{{ rook_repo_dest }}/deploy/examples/external/import-external-cluster.sh"
+    mode: '0755'
+    state: file
+
+- name: Run import script with Ceph env
+  shell: |
+    source /tmp/rook_ceph_env.sh
+    ./import-external-cluster.sh
+  args:
+    chdir: "{{ rook_repo_dest }}/deploy/examples/external"
+    executable: /bin/bash

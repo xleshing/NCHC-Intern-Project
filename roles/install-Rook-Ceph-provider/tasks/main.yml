@@ -1,0 +1,168 @@
+- name: Clone Rook repository
+  ansible.builtin.git:
+    repo: "{{ rook_repo_url }}"
+    version: "{{ rook_repo_version }}"
+    dest: "{{ rook_repo_dest }}"
+    force: yes
+
+- name: enable host networking
+  ansible.builtin.lineinfile:
+    path: "{{ rook_repo_dest }}/deploy/examples/cluster.yaml"
+    regexp: '^(\s*)#\s*provider:\s*host'
+    line: '\1provider: host'
+    backrefs: yes
+    backup: yes
+
+- name: deploy Rook CRDs
+  shell: kubectl create -f crds.yaml
+  args:
+    chdir: "{{ rook_repo_dest }}/deploy/examples"
+  register: out_crds
+  failed_when: out_crds.rc not in [0,1]
+- debug:
+    msg: "{{ out_crds }}"
+
+- name: wait etcd
+  pause:
+    seconds: "{{ wait_etcd_timeout }}"
+
+- name: deploy Rook Common
+  shell: kubectl create -f common.yaml
+  args:
+    chdir: "{{ rook_repo_dest }}/deploy/examples"
+  register: out_common
+  failed_when: out_common.rc not in [0,1]
+- debug:
+    msg: "{{ out_common }}"
+
+- name: wait etcd
+  pause:
+    seconds: "{{ wait_etcd_timeout }}"
+
+- name: deploy Rook Operator
+  shell: kubectl create -f operator.yaml
+  args:
+    chdir: "{{ rook_repo_dest }}/deploy/examples"
+  register: out_operator
+  failed_when: out_operator.rc not in [0,1]
+- debug:
+    msg: "{{ out_operator }}"
+
+- name: wait etcd
+  pause:
+    seconds: "{{ wait_etcd_timeout }}"
+
+- name: Deploy CephCluster
+  shell: kubectl create -f cluster.yaml
+  args:
+    chdir: "{{ rook_repo_dest }}/deploy/examples"
+  register: out_cluster
+  failed_when: out_cluster.rc not in [0,1]
+- debug:
+    msg: "{{ out_cluster }}"
+
+- name: wait etcd
+  pause:
+    seconds: "{{ wait_etcd_timeout }}"
+
+- name: Deploy RBD StorageClass
+  ansible.builtin.command:
+    cmd: kubectl -n rook-ceph create -f csi/rbd/storageclass.yaml
+    chdir: "{{ rook_repo_dest }}/deploy/examples"
+
+- name: Deploy CephFilesystem CR
+  ansible.builtin.command:
+    cmd: kubectl -n rook-ceph create -f filesystem.yaml
+    chdir: "{{ rook_repo_dest }}/deploy/examples"
+
+- name: Deploy CephFS StorageClass
+  ansible.builtin.command:
+    cmd: kubectl -n rook-ceph create -f csi/cephfs/storageclass.yaml
+    chdir: "{{ rook_repo_dest }}/deploy/examples"
+
+- name: Deploy Ceph Toolbox
+  ansible.builtin.command:
+    cmd: kubectl create -f toolbox.yaml
+    chdir: "{{ rook_repo_dest }}/deploy/examples"
+
+- name: wait rook-ceph-tools Pod ready
+  ansible.builtin.command:
+    cmd: >
+      kubectl -n rook-ceph wait --for=condition=Ready pod
+      -l app=rook-ceph-tools --timeout={{ wait_toolbox_timeout }}s
+
+- name: get rook-ceph-tools Pod name
+  ansible.builtin.command:
+    cmd: >
+      kubectl -n rook-ceph get pod
+      -l app=rook-ceph-tools
+      -o jsonpath='{.items[0].metadata.name}'
+  register: toolbox_pod
+
+- name: cp create-external-cluster-resources.py to toolbox Pod
+  ansible.builtin.command:
+    cmd: >
+      kubectl -n rook-ceph cp
+      {{ rook_repo_dest }}/deploy/examples/create-external-cluster-resources.py
+      {{ toolbox_pod.stdout }}:/etc/ceph/
+
+- name: wait rbd-data-pool replicapool
+  ansible.builtin.command: >
+    kubectl -n rook-ceph exec {{ toolbox_pod.stdout }} -- ceph osd pool ls
+  register: pool_list
+  failed_when: false
+  until: "'replicapool' in pool_list.stdout.split()"
+  retries: "{{ wait_retries }}"
+  delay: "{{ wait_delay }}"
+
+- name: wait cephfs-filesystem myfs
+  ansible.builtin.command: >
+    kubectl -n rook-ceph exec {{ toolbox_pod.stdout }} -- ceph fs ls
+  register: fs_list
+  failed_when: false
+  until: "'myfs' in fs_list.stdout"
+  retries: "{{ wait_retries }}"
+  delay: "{{ wait_delay }}"
+
+- name: run create-external-cluster-resources.py
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - -n
+      - rook-ceph
+      - exec
+      - "{{ toolbox_pod.stdout }}"
+      - --
+      - python3
+      - /etc/ceph/create-external-cluster-resources.py
+      - --rbd-data-pool-name
+      - replicapool
+      - --cephfs-filesystem-name
+      - myfs
+      - --namespace
+      - rook-ceph
+      - --format
+      - bash
+  register: external_resources
+- debug:
+    msg: "{{ external_resources.stdout_lines }}"
+
+- name: turn export to list & set_fact rook_ceph_env
+  set_fact:
+    rook_ceph_env: >-
+      {{
+        external_resources.stdout_lines
+          [
+        (external_resources.stdout_lines.index('"') + 1)
+        :
+          ]
+      }}
+- debug:
+    msg: "{{ rook_ceph_env }}"
+
+- name: add host & include rook_ceph_env
+  add_host:
+    name: "{{ target_group }}"
+    groups: "{{ target_group }}"
+    vars:  
+      rook_ceph_env: "{{ rook_ceph_env }}"
