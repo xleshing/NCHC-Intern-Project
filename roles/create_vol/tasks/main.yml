@@ -28,6 +28,7 @@
       size: "{{ vol_size }}"
       type: "{{ vol_type }}"
     status_code: [200, 201]
+    timeout: "{{ api_timeout }}"
   register: create_response
 
 - name: Fetch list of volumes to find Vol_ID
@@ -72,11 +73,11 @@
 
 - name: Search SITE_ID
   set_fact:
-    site_id: >-
-      {{ (sites_response.json | selectattr('name','search', vol_name) | sort(attribute='create_time'))[-1].servers[server_idx].id }}
+    site_server_id: >-
+      {{ (sites_response.json | selectattr('name','search', vol_name) | sort(attribute='create_time'))[-1].servers[server_idx | int].id }}
 - debug:
     msg:
-      "{{ site_id }}"
+      "{{ sites_response.json | selectattr('name','search', vol_name) | list }}"
 
 - name: Upd volume (attach vm) 
   uri:
@@ -88,7 +89,7 @@
       x-api-key: "{{ twcc_api_key }}"
     body_format: json
     body:
-      server: "{{ site_id }}"
+      server: "{{ site_server_id }}"
       status: "attach"
     status_code: [200, 201]
   register: status_check
