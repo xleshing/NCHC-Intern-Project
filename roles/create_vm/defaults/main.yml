@@ -1,20 +1,18 @@
-twcc_api_host: "openstack-taichung-default-2"
-key_pair_name: "kp1751511188256"
-flavor: "v.xsuper"
-volume_size: 200
-volume_type: "block_storage-hdd"
-private_network: "default_network"
-sg_name: "5352534_vm1751511071443_sg"
+twcc_api_host: "{{ create_vm.twcc_api_host }}"
+key_pair_name: "{{ create_vm.key_pair_name }}"
+volume_size: "{{ create_vm.volume_size }}"
+volume_type: "{{ create_vm.volume_type }}"
+private_network: "{{ create_vm.private_network }}"
+sg_name: "{{ create_vm.sg_name }}"
 ssh_user: "{{ ssh_user }}"
 new_password: "{{ secret }}"
-vm_name: "APItest"
-vm_desc: ""
-api_timeout: 120
-initial_waiting_time: 60
-poll_interval: 30  
-poll_retries: 10  
-vm_ssh_port: 22
-ssh_interval: 10
-ssh_timeout: 300
-ubuntu_version: "Ubuntu-22.04"
-init_command: sed -i '1iaccount sufficient pam_permit.so' /etc/pam.d/common-account  && echo "{{ ssh_user }}:{{ new_password }}" | chpasswd && printf "{{ ssh_user }} ALL=(ALL) NOPASSWD:ALL\n" >/etc/sudoers.d/{{ ssh_user }} && chmod 440 /etc/sudoers.d/{{ ssh_user }}
+vm_desc: "{{ create_vm.vm_desc }}"
+api_timeout: "{{ create_vm.api_timeout }}"
+initial_waiting_time: "{{ create_vm.initial_waiting_time }}"
+poll_interval: "{{ create_vm.poll_interval }}" 
+poll_retries: "{{ create_vm.poll_retries }}" 
+vm_ssh_port: "{{ create_vm.vm_ssh_port }}"
+ssh_interval: "{{ create_vm.ssh_interval }}"
+ssh_timeout: "{{ create_vm.ssh_timeout }}"
+ubuntu_version: "{{ create_vm.ubuntu_version }}"
+init_command: "{{ create_vm.init_command }}"
