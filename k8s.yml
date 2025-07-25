@@ -1,3 +1,6 @@
+# In the Ubuntu initialization command, NOPASSWD is already set, so all ansible_become_pass: "{{ secret }}" lines are commented out.
+# If encounter a missing sudo password error, try uncommenting these lines to resolve the issue.
+# ── create_main_cluster_start ──────────────────────────────────────
 - name: Create all cluster VMs
   hosts: localhost
   connection: local
@@ -9,7 +12,7 @@
       vars:
         target_group: "{{ cp_target_group_name }}"
         flavor: "{{ create_vm.cp_flavor }}"
-        vm_name: "control-{{ idx }}"
+        vm_name: "control"
       loop: "{{ range(control_count) | list }}"
       loop_control:
         index_var: idx
@@ -20,7 +23,7 @@
       vars:
         target_group: "{{ master_target_group_name }}"
         flavor: "{{ create_vm.master_flavor }}"
-        vm_name: "master-{{ idx }}"
+        vm_name: "master"
       loop: "{{ range(master_count) | list }}"
       loop_control:
         index_var: idx
@@ -43,7 +46,7 @@
       vars:
         target_group: "{{ worker_target_group_name }}"
         flavor: "{{ item }}"
-        vm_name: "{{ item }}-worker-{{ idx }}"
+        vm_name: "{{ item | replace('.', '_') }}-worker"
       loop: "{{ worker_flavors }}"
       loop_control:
         index_var: idx
@@ -59,9 +62,9 @@
     target_group: "{{ endpoint_target_group_name }}"
   roles:
     - create_lb
+# ── create_main_cluster_complet ────────────────────────────────────
 
 # ── create_ceph_cluster_start ──────────────────────────────────────
-
 - name: Create all ceph_cluster VMs
   hosts: localhost
   connection: local
@@ -73,7 +76,7 @@
       vars:
         target_group: "{{ ceph_cp_target_group_name }}"
         flavor: "{{ create_vm.ceph_cp_flavor }}"
-        vm_name: "ceph_control-{{ idx }}"
+        vm_name: "ceph_control"
       loop: "{{ range(ceph_control_count) | list }}"
       loop_control:
         index_var: idx
@@ -84,7 +87,7 @@
       vars:
         target_group: "{{ ceph_master_target_group_name }}"
         flavor: "{{ create_vm.ceph_master_flavor }}"
-        vm_name: "ceph_master-{{ idx }}"
+        vm_name: "ceph_master"
       loop: "{{ range(ceph_master_count) | list }}"
       loop_control:
         index_var: idx
@@ -95,7 +98,7 @@
       vars:
         target_group: "{{ ceph_worker_target_group_name }}"
         flavor: "{{ create_vm.ceph_worker_flavor }}"
-        vm_name: "ceph_worker-{{ idx }}"
+        vm_name: "ceph_worker"
       loop: "{{ range(ceph_worker_count) | list }}"
       loop_control:
         index_var: idx
@@ -125,31 +128,33 @@
     target_group: "{{ ceph_endpoint_target_group_name }}"
   roles:
     - create_lb
-
 # ── create_ceph_cluster_complet ────────────────────────────────────
 
+# ── install_all_deps_start ──────────────────────────────────────
 - name: Time synchronization
   hosts: control_plan,masters,workers,ceph_control_plan,ceph_masters,ceph_workers 
   become: true
-  vars:
-    ansible_become_password: "{{ secret }}"
+#  vars:
+#    ansible_become_pass: "{{ secret }}"
   roles:
     - install-ntp
 
 - name: install k8s-deps (Docker, containerd, kubelet/kubeadm/kubectl)
   hosts: control_plan,masters,workers,ceph_control_plan,ceph_masters,ceph_workers
   become: true
-  vars:
-    ansible_become_password: "{{ secret }}"
+#  vars:
+#    ansible_become_pass: "{{ secret }}"
   roles:
     - install-k8s-deps
+# ── install_all_deps_complet ──────────────────────────────────────
 
+# ── deploy_main_cluster_start ──────────────────────────────────────
 - name: Deploy Kubernetes Master and generate tokens
   hosts: control_plan
   remote_user: "{{ ssh_user }}"
   become: true
-  vars:
-    ansible_become_password: "{{ secret }}"
+#  vars:
+#    ansible_become_pass: "{{ secret }}"
   tasks:     
     - name: Init Kubernetes Master
       master_init:
@@ -168,8 +173,10 @@
 - name: Join Kubernetes Master
   hosts: masters
   become: true
+  # If do not execute the steps in order, a check etcd health timeout err may occur.
+  serial: 1
   vars:
-    ansible_become_password: "{{ secret }}"
+#    ansible_become_pass: "{{ secret }}"
     join_endpoint: "{{ hostvars[ groups[cp_target_group_name][0] ].init_out.join_endpoint }}"
     token: "{{ hostvars[ groups[cp_target_group_name][0] ].init_out.token }}"
     discovery_token_hash: "{{ hostvars[ groups[cp_target_group_name][0] ].init_out.discovery_token_hash }}"
@@ -184,42 +191,52 @@
       register: master_join_out
     - debug:
         msg: "Join output: {{ master_join_out.stdout }}"
+# If a “check etcd health timeout” err occurs, try waiting for a while—this may resolve the issue. 
+#    - name: Wait "{{ wait_etcd_timeout }}" s for etcd to stabilise
+#      pause:
+#        seconds: "{{ wait_etcd_timeout }}"
 
 - name: Deploy Kubernetes Worker and using tokens
   hosts: workers
   become: true
+  # If not execute the steps in order, cilium pod Init:CrashLoopBackOff err may occur.
+  serial: 1
   vars:
-    ansible_become_password: "{{ secret }}"
+#    ansible_become_pass: "{{ secret }}"
     join_endpoint: "{{ hostvars[ groups[cp_target_group_name][0] ].init_out.join_endpoint }}"
     token: "{{ hostvars[ groups[cp_target_group_name][0] ].init_out.token }}"
     discovery_token_hash: "{{ hostvars[ groups[cp_target_group_name][0] ].init_out.discovery_token_hash }}"
   tasks:                                                          
     - name: Init Kubernetes Worker
-      slave_init:
+      worker_init:
         join_endpoint: "{{ join_endpoint }}"
         token: "{{ token }}"
         discovery_token_hash: "{{ discovery_token_hash }}"
       register: join_out
     - debug:
         msg: "Join output: {{ join_out.stdout }}"
+# If a “cilium pod Init:CrashLoopBackOff” err occurs, try waiting for a while—this may resolve the issue. 
+#    - name: Wait "{{ wait_etcd_timeout }}" s for etcd to stabilise
+#      pause:
+#        seconds: "{{ wait_etcd_timeout }}"
 
 - name: install Cilium
   hosts: control_plan
   become: true
   vars:
-    ansible_become_password: "{{ secret }}"
+#    ansible_become_pass: "{{ secret }}"
     cilium_cluster_cidr: "{{ cluster_cidr_args }}"
   roles:
     - install-cilium
+# ── deploy_main_cluster_complet ────────────────────────────────────
 
 # ── deploy_ceph_cluster_start ──────────────────────────────────────
-
 - name: Deploy ceph_Kubernetes Master and generate tokens
   hosts: ceph_control_plan
   remote_user: "{{ ssh_user }}"
   become: true
-  vars:
-    ansible_become_password: "{{ secret }}"
+#  vars:
+#    ansible_become_pass: "{{ secret }}"
   tasks:
     - name: Init ceph_Kubernetes Master
       master_init:
@@ -238,8 +255,10 @@
 - name: Join ceph_Kubernetes Master
   hosts: ceph_masters
   become: true
+  # If not execute the steps in order, a check etcd health timeout err may occur.
+  serial: 1
   vars:
-    ansible_become_password: "{{ secret }}"
+#    ansible_become_pass: "{{ secret }}"
     join_endpoint: "{{ hostvars[ groups[ceph_cp_target_group_name][0] ].ceph_init_out.join_endpoint }}"
     token: "{{ hostvars[ groups[ceph_cp_target_group_name][0] ].ceph_init_out.token }}"
     discovery_token_hash: "{{ hostvars[ groups[ceph_cp_target_group_name][0] ].ceph_init_out.discovery_token_hash }}"
@@ -254,33 +273,44 @@
       register: ceph_master_join_out
     - debug:
         msg: "Join output: {{ ceph_master_join_out.stdout }}"
+# If a “check etcd health timeout” err occurs, try waiting for a while—this may resolve the issue.  
+#    - name: Wait "{{ wait_etcd_timeout }}" s for etcd to stabilise
+#      pause:
+#        seconds: "{{ wait_etcd_timeout }}"
 
 - name: Deploy ceph_Kubernetes Worker and using tokens
   hosts: ceph_workers
-  become: true
+  become: true 
+  # If not execute the steps in order, cilium pod Init:CrashLoopBackOff err may occur.
+  serial: 1
   vars:
-    ansible_become_password: "{{ secret }}"
+#    ansible_become_pass: "{{ secret }}"
     join_endpoint: "{{ hostvars[ groups[ceph_cp_target_group_name][0] ].ceph_init_out.join_endpoint }}"
     token: "{{ hostvars[ groups[ceph_cp_target_group_name][0] ].ceph_init_out.token }}"
     discovery_token_hash: "{{ hostvars[ groups[ceph_cp_target_group_name][0] ].ceph_init_out.discovery_token_hash }}"
   tasks:
     - name: Init ceph_Kubernetes Worker
-      slave_init:
+      worker_init:
         join_endpoint: "{{ join_endpoint }}"
         token: "{{ token }}"
         discovery_token_hash: "{{ discovery_token_hash }}"
       register: ceph_join_out
     - debug:
         msg: "Join output: {{ ceph_join_out.stdout }}"
+# If a “cilium pod Init:CrashLoopBackOff” err occurs, try waiting for a while—this may resolve the issue. 
+#    - name: Wait "{{ wait_etcd_timeout }}" s for etcd to stabilise
+#      pause:
+#        seconds: "{{ wait_etcd_timeout }}"
 
 - name: install ceph_Cilium
   hosts: ceph_control_plan
   become: true
   vars:
-    ansible_become_password: "{{ secret }}"
+#    ansible_become_pass: "{{ secret }}"
     cilium_cluster_cidr: "{{ ceph_cluster_cidr_args }}"
   roles:
     - install-cilium
+# ── deploy_ceph_cluster_complet ────────────────────────────────────
 
 - name: install Rook-Ceph-provider
   hosts: ceph_control_plan
@@ -290,14 +320,12 @@
   roles:
     - install-Rook-Ceph-provider
 
-# ── deploy_ceph_cluster_complet ────────────────────────────────────
-
 - name: install Rook-Ceph-consumer
   hosts: control_plan
   remote_user: "{{ ssh_user }}"
   vars:
     kube_user: "{{ ansible_user }}"
-    rook_ceph_env: "{{ hostvars[ groups[ceph_provider_target_group_name][0] ].vars.rook_ceph_env }}"
+    rook_ceph_env: "{{ hostvars[ groups[ceph_cp_target_group_name][0] ].rook_ceph_env }}"
   roles:
     - install-Rook-Ceph-consumer
 
@@ -306,7 +334,7 @@
   remote_user: "{{ ssh_user }}"
   become: true
   vars:
-    ansible_become_password: "{{ secret }}"
+#    ansible_become_pass: "{{ secret }}"
     kube_user: "{{ ansible_user }}"
   roles:
     - install-Nvidia-GPU-Operator
