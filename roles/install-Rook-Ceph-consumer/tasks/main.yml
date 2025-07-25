@@ -6,7 +6,7 @@
     force: yes
 
 - name: deploy Rook CRDs
-  shell: kubectl create -f crds.yaml
+  shell: kubectl apply -f crds.yaml
   args:
     chdir: "{{ rook_repo_dest }}/deploy/examples"
   register: out_crds
@@ -19,7 +19,7 @@
     seconds: "{{ wait_etcd_timeout }}"
 
 - name: deploy Rook Common
-  shell: kubectl create -f common.yaml
+  shell: kubectl apply -f common.yaml
   args:
     chdir: "{{ rook_repo_dest }}/deploy/examples"
   register: out_common
@@ -32,7 +32,7 @@
     seconds: "{{ wait_etcd_timeout }}"
 
 - name: deploy Rook Operator
-  shell: kubectl create -f operator.yaml
+  shell: kubectl apply -f operator.yaml
   args:
     chdir: "{{ rook_repo_dest }}/deploy/examples"
   register: out_operator
@@ -43,9 +43,9 @@
 - name: wait etcd
   pause:
     seconds: "{{ wait_etcd_timeout }}"
-  # create/apply
+
 - name: Deploy Rook Common-external, and Cluster-external
-  shell: kubectl create -f common-external.yaml -f cluster-external.yaml
+  shell: kubectl apply -f common-external.yaml -f cluster-external.yaml
   args:  
     chdir: "{{ rook_repo_dest }}/deploy/examples/external"
   register: out_external
