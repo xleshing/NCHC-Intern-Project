@@ -13,6 +13,13 @@
     backrefs: yes
     backup: yes
 
+- name: enable Rook discovery daemon
+  ansible.builtin.lineinfile:
+    path: "{{ rook_repo_dest }}/deploy/examples/operator.yaml"
+    regexp: '^\s*ROOK_ENABLE_DISCOVERY_DAEMON:' 
+    line:  '  ROOK_ENABLE_DISCOVERY_DAEMON: "true"'
+    backup: yes
+
 - name: deploy Rook CRDs
   shell: kubectl create -f crds.yaml
   args:
@@ -85,11 +92,9 @@
     cmd: kubectl create -f toolbox.yaml
     chdir: "{{ rook_repo_dest }}/deploy/examples"
 
-- name: wait rook-ceph-tools Pod ready
-  ansible.builtin.command:
-    cmd: >
-      kubectl -n rook-ceph wait --for=condition=Ready pod
-      -l app=rook-ceph-tools --timeout={{ wait_toolbox_timeout }}s
+- name: wait etcd
+  pause:
+    seconds: "{{ wait_etcd_timeout }}"
 
 - name: get rook-ceph-tools Pod name
   ansible.builtin.command:
@@ -99,6 +104,17 @@
       -o jsonpath='{.items[0].metadata.name}'
   register: toolbox_pod
 
+- name: Wait for Ceph cluster to report HEALTH_OK
+  ansible.builtin.shell: |
+    kubectl -n rook-ceph exec {{ toolbox_pod.stdout }} -- \
+      ceph status --format plain | grep -q 'health: HEALTH_OK'
+  register: ceph_health
+  until: ceph_health.rc == 0
+  retries: "{{ wait_health_retries | int }}"
+  delay: "{{ wait_health_delay }}"
+  failed_when: ceph_health.rc != 0
+
+# Do not use the create-external-cluster-resources.py in external/; it’s a symlink to the one in examples/
 - name: cp create-external-cluster-resources.py to toolbox Pod
   ansible.builtin.command:
     cmd: >
@@ -123,6 +139,25 @@
   until: "'myfs' in fs_list.stdout"
   retries: "{{ wait_retries }}"
   delay: "{{ wait_delay }}"
+
+- name: Wait for prometheus endpoint
+  ansible.builtin.shell: |
+    kubectl -n rook-ceph exec {{ toolbox_pod.stdout }} -- \
+      ceph mgr services --format json | \
+      jq -e '.prometheus | type=="string" and (. | length) > 0'
+  register: prometheus_result
+  failed_when: false
+  until: prometheus_result.rc == 0
+  retries: "{{ wait_prometheus_retries }}"
+  delay: "{{ wait_prometheus_delay }}"
+
+- name: Get current prometheus endpoint
+  shell: |
+    kubectl -n rook-ceph exec {{ toolbox_pod.stdout }} -- \
+      ceph mgr services --format json | jq -r '.prometheus'
+  register: prom_ep
+- debug:
+    msg: "Prometheus endpoint: {{ prom_ep.stdout }}"
 
 - name: run create-external-cluster-resources.py
   ansible.builtin.command:
@@ -160,9 +195,6 @@
 - debug:
     msg: "{{ rook_ceph_env }}"
 
-- name: add host & include rook_ceph_env
-  add_host:
-    name: "{{ target_group }}"
-    groups: "{{ target_group }}"
-    vars:  
-      rook_ceph_env: "{{ rook_ceph_env }}"
+- name: set rook_ceph_env
+  set_fact:
+    rook_ceph_env: "{{ rook_ceph_env }}"
