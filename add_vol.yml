@@ -1,0 +1,173 @@
+# In the Ubuntu initialization command, NOPASSWD is already set, so all ansible_become_pass: "{{ secret }}" lines are commented out.
+# If encounter a missing sudo password error, try uncommenting these lines to resolve the issue.
+- name: create group
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: add {{ add_vol.ceph_add_cp_ip }} into [{{ ceph_cp_target_group_name }}]
+      add_host:
+        name: "{{ add_vol.ceph_add_cp_ip }}"
+        groups: "{{ ceph_cp_target_group_name }}"
+        ansible_host: "{{ add_vol.ceph_add_cp_ip }}"
+
+- name: Determine scaling needs
+  hosts: ceph_control_plan
+  gather_facts: false
+  vars:
+    max_vol_per_worker: "{{ add_vol.max_vol_per_worker | int }}"
+  tasks:
+    - name: Query Kubernetes nodes
+      shell: kubectl get nodes --no-headers -o custom-columns=NAME:.metadata.name
+      register: node_list
+
+    - name: Filter worker nodes and extract prefix
+      set_fact:
+        worker_list: "{{
+          node_list.stdout_lines
+          | select('search', 'worker')
+          | map('split', '-', 1)
+          | map('first')
+          | list
+        }}"
+    - debug:
+        msg: "{{ worker_list }}"
+
+    - name: init vol_list
+      set_fact:
+        vol_list: [] 
+
+    - name: Search volume count per worker
+      include_role:
+        name: get_vol
+      vars:
+        vm_name: "{{ worker }}"
+      loop: "{{ worker_list }}"
+      loop_control:
+        loop_var: worker
+        label: "{{ worker }}"
+
+    - name: Calculate total volumes (existing + requested)
+      set_fact:
+        total_volumes: >-
+          {{
+            vol_list
+            | map('int') 
+            | sum
+            + (add_vol.volume_count | int)
+          }}
+    - debug:
+        var: total_volumes
+
+    - name: Calculate current capacity
+      set_fact:
+        current_capacity: >-
+          {{ (worker_list | length) * (max_vol_per_worker | int) }}
+    - debug:
+        var: current_capacity
+
+    - name: Decide if capacity is sufficient
+      set_fact:
+        capacity_sufficient: "{{ (current_capacity | int) >= (total_volumes | int) }}"
+    - debug:
+       var: capacity_sufficient
+    - block:
+        - name: Calculate how many new Vols are needed
+          set_fact:
+            needed_vols: "{{ (total_volumes | int)  - (current_capacity | int) }}"
+         
+        - name: Calculate how many new VMs are needed  
+          set_fact:
+            need_vm: >-
+              {{ ((needed_vols | int) > 0) | ternary( (((needed_vols | int) + 1) // 2), 0 )}}
+        - debug:
+            var: need_vm
+      when: not capacity_sufficient | bool
+
+- name: Add volumes if capacity sufficient
+  hosts: ceph_control_plan
+  gather_facts: false
+  tasks:
+    - name: Add new volumes to existing workers
+      include_role:
+        name: add_vol
+      loop: "{{ range(add_vol.volume_count) | list }}"
+      loop_control:
+        index_var: idx
+      when: capacity_sufficient | bool
+
+- name: Provision VMs if capacity insufficient
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Create new VM
+      include_role:
+        name: create_vm
+      vars:
+        target_group: "{{ ceph_worker_target_group_name }}"
+        flavor: "{{ add_vol.ceph_worker_flavor }}"
+        vm_name: "ceph-worker"
+      loop: "{{ range(hostvars[ groups[ceph_cp_target_group_name][0] ]['need_vm'] | int) | list }}"
+      loop_control:
+        index_var: idx
+      when: not hostvars[ groups[ceph_cp_target_group_name][0] ]['capacity_sufficient'] | bool
+
+- name: Post-scale setup on new workers
+  hosts: ceph_workers
+  become: true
+# vars:
+#   ansible_become_pass: "{{ secret }}"
+  tasks:
+    - block:
+        - include_role:
+            name: install-ntp
+        - include_role:
+            name: install-k8s-deps
+      when: not hostvars[ groups[ceph_cp_target_group_name][0] ].capacity_sufficient | bool
+
+- name: Generate ceph kubeadm join command
+  hosts: ceph_control_plan
+  gather_facts: false
+  tasks:
+    - block:
+        - name: Generate join parameters
+          worker_join:
+          register: add_info
+        - debug:
+            msg:
+              - "endpoint: {{ add_info.join_endpoint }}"
+              - "token: {{ add_info.token }}"
+              - "hash: {{ add_info.discovery_token_hash }}"
+              - "cert_key: {{ add_info.certificate_key | default('N/A') }}"
+      when: not capacity_sufficient | bool
+
+- name: Join new ceph workers
+  hosts: ceph_workers
+  become: true
+  vars:
+#    ansible_become_pass: "{{ secret }}"
+    join_endpoint: "{{ hostvars[ groups[ceph_cp_target_group_name][0] ].add_info.join_endpoint }}"
+    token: "{{ hostvars[ groups[ceph_cp_target_group_name][0] ].add_info.token }}"
+    discovery_token_hash: "{{ hostvars[ groups[ceph_cp_target_group_name][0] ].add_info.discovery_token_hash }}"
+  tasks:
+    - name: Init ceph Worker
+      worker_init:
+        join_endpoint: "{{ join_endpoint }}"
+        token: "{{ token }}"
+        discovery_token_hash: "{{ discovery_token_hash }}"
+      register: add_out
+    - debug:
+        msg: "Join output: {{ add_out.stdout }}"
+      when: not hostvars[ groups[ceph_cp_target_group_name][0] ].capacity_sufficient | bool
+
+- name: attach volumes
+  hosts: ceph_control_plan
+  gather_facts: false
+  tasks:
+    - name: Add new volumes to new workers
+      include_role:
+        name: add_vol
+      loop: "{{ range(add_vol.volume_count) | list }}"
+      loop_control:
+        index_var: idx
+      when: not capacity_sufficient | bool

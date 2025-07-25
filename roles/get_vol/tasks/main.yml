@@ -1,0 +1,42 @@
+- name: Fetch list of sites to find SITE_SERVSER_ID
+  uri:
+    url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/sites/?project={{ twcc_project_id }}"
+    method: GET
+    headers:
+      Accept: application/json
+      x-api-host: "{{ twcc_api_host }}"
+      x-api-key: "{{ twcc_api_key }}"
+  register: sites_response
+
+- name: Search SITE_SERVSER_ID
+  set_fact:
+    site_server_id: >-
+      {{ (sites_response.json | selectattr('name','search', vm_name) | sort(attribute='create_time'))[-1].servers[server_idx | int].id }}
+- debug:
+    msg:
+      "{{ site_server_id }}"
+
+- name: Fetch all vol for site
+  uri:
+    url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/volumes/?project={{ twcc_project_id }}&attached_host={{ site_server_id }}"
+    method: GET
+    headers:
+      Accept: application/json
+      x-api-host: "{{ twcc_api_host }}"
+      x-api-key: "{{ twcc_api_key }}"
+  register: vol_response
+
+- name: Select vol IDs
+  set_fact:
+    vol_num: >-
+      {{ (vol_response.json
+        | selectattr('is_bootable', 'equalto', false)
+        | map(attribute='id')
+        | list
+        | length) }}
+- debug:
+    msg: "{{ vol_num }}" 
+
+- name: make vol_list
+  set_fact:
+    vol_list: "{{ vol_list + [ (vol_num | int) ] }}" 

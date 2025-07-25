@@ -1,0 +1,3 @@
+twcc_api_host: "{{ get_vol.twcc_api_host }}"
+server_idx: "{{ get_vol.server_idx }}"
+

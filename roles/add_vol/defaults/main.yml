@@ -1,0 +1,2 @@
+max_vol_per_worker: "{{ add_vol.max_vol_per_worker }}"
+ceph_worker_flavor: "{{ add_vol.ceph_worker_flavor }}"

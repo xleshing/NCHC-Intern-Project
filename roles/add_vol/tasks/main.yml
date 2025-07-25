@@ -1,0 +1,59 @@
+- name: Query Kubernetes nodes
+  shell: kubectl get nodes --no-headers -o custom-columns=NAME:.metadata.name
+  register: node_list
+
+- name: Filter worker nodes and extract prefix
+  set_fact:
+    worker_list: "{{
+      node_list.stdout_lines
+      | select('search', 'worker')
+      | map('split', '-', 1)
+      | map('first')
+      | list
+    }}"
+- debug:
+    msg: "{{ worker_list }}"
+
+- name: init vol_list
+  set_fact:
+    vol_list: []
+
+- name: Search volume count per worker
+  include_role:
+    name: get_vol
+  vars:
+    vm_name: "{{ item }}"
+  loop: "{{ worker_list }}"
+  loop_control:
+    label: "{{ item }}"
+
+- name: Build volume map (worker -> vol_count)
+  set_fact:
+    vol_map: "{{ dict(worker_list | zip(vol_list)) }}"
+- debug:
+    msg: "{{ vol_map }}"
+
+- name: Filter candidate workers (<= max_vol_per_worker)
+  set_fact:
+    candidates: >-
+      {{
+        vol_map
+        | dict2items
+        | selectattr('value', 'le', (max_vol_per_worker | int))
+        | sort(attribute='value')
+        | map(attribute='key')
+        | list
+      }}
+
+- name: Set target_worker or mark none
+  set_fact:
+    target_worker: "{{ candidates[0] | default('') }}"
+- debug:
+    msg: "{{ target_worker }}"
+
+- name: Add new volume on existing worker
+  include_role:
+    name: create_vol
+  vars:
+    vol_name: "{{ target_worker }}"
+  when: target_worker != ''
