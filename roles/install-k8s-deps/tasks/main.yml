@@ -86,6 +86,7 @@
       - ca-certificates
       - curl
       - gpg
+      - jq
     state: present
     update_cache: yes
 
@@ -126,3 +127,5 @@
 - name: hold kubelet, kubeadm, kubectl at current version
   ansible.builtin.command:
     cmd: apt-mark hold kubelet kubeadm kubectl
+
+
