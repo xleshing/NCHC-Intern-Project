@@ -1,0 +1,83 @@
+# In the Ubuntu initialization command, NOPASSWD is already set, so all ansible_become_pass: "{{ secret }}" lines are commented out.
+# If encounter a missing sudo password error, try uncommenting these lines to resolve the issue.
+- name: create worker vm
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: add {{ add_node.add_cp_ip }} into [{{ cp_target_group_name }}]
+      add_host:
+        name: "{{ add_node.add_cp_ip }}"
+        groups: "{{ cp_target_group_name }}"
+        ansible_host: "{{ add_node.add_cp_ip }}"
+
+    - name: init worker_flavors
+      set_fact:
+        worker_flavors: []
+
+    - name: flatten flavor_counts
+      set_fact:
+        worker_flavors: "{{ worker_flavors + ([ item.key ] * (item.value | int)) }}"
+      loop: "{{ add_node.flavor_counts | dict2items }}"
+      when: item.value | int > 0
+    - debug:
+        msg: "{{ worker_flavors }}"
+
+    - name: Create worker VMs
+      include_role:
+        name: create_vm
+      vars:
+        target_group: "{{ worker_target_group_name }}"
+        flavor: "{{ item }}"
+        vm_name: "{{ item | replace('.', '_') }}-worker"
+      loop: "{{ worker_flavors }}"
+      loop_control:
+        index_var: idx
+
+- name: Time synchronization
+  hosts: workers
+  become: true
+#  vars:
+#    ansible_become_pass: "{{ secret }}"
+  roles:
+    - install-ntp
+
+- name: install k8s-deps (Docker, containerd, kubelet/kubeadm/kubectl)
+  hosts: workers
+  become: true
+#  vars:
+#    ansible_become_pass: "{{ secret }}"
+  roles:
+    - install-k8s-deps
+
+- name: Generate kubeadm join command
+  hosts: control_plan
+  tasks:
+    - name: Generate kubeadm join command
+      worker_join:
+      register: add_info
+    - debug:
+        msg:
+          - "endpoint: {{ add_info.join_endpoint }}"
+          - "token: {{ add_info.token }}"
+          - "hash: {{ add_info.discovery_token_hash }}"
+          - "cert_key: {{ add_info.certificate_key | default('N/A') }}"
+
+- name: add Worker
+  hosts: workers
+  become: true
+  vars:
+#    ansible_become_pass: "{{ secret }}"
+    join_endpoint: "{{ hostvars[ groups[cp_target_group_name][0] ].add_info.join_endpoint }}"
+    token: "{{ hostvars[ groups[cp_target_group_name][0] ].add_info.token }}"
+    discovery_token_hash: "{{ hostvars[ groups[cp_target_group_name][0] ].add_info.discovery_token_hash }}"
+  tasks:
+    - name: Init Worker
+      worker_init:
+        join_endpoint: "{{ join_endpoint }}"
+        token: "{{ token }}"
+        discovery_token_hash: "{{ discovery_token_hash }}"
+      register: add_out
+    - debug:
+        msg: "Join output: {{ add_out.stdout }}"
+
