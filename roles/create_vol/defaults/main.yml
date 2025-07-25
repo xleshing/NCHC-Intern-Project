@@ -4,6 +4,6 @@ api_timeout: "{{ create_vol.api_timeout }}"
 initial_waiting_time: "{{ create_vol.initial_waiting_time }}"
 poll_interval: "{{ create_vol.poll_interval }}"
 poll_retries: "{{ create_vol.poll_retries }}"
-vol_size: "{{ create_vol.vol_size }}"
+vol_size: "{{ vol_size }}"
 vol_type: "{{ create_vol.vol_type }}"
 
