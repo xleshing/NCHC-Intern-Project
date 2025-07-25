@@ -22,29 +22,29 @@
 
 | 參數                 | 說明                | 預設值               |
 |--------------------|-------------------|-------------------|
-| `ssh_user`<sup>[*\**](#ssh_user)</sup>         | 所有遠端主機 SSH 登入使用者。 | `ubuntu`          |
+| `ssh_user`<sup>[*1*](#ssh_user)</sup>         | 所有遠端主機 SSH 登入使用者。 | `ubuntu`          |
 | `secret`           | `ssh_user` 的密碼。   |  |
 | `twcc_project_id`  | TWCC 專案 ID。       |              |
 | `twcc_solution_id` | TWCC 解決方案 ID。     |              |
 | `twcc_api_key`     | TWCC API Key。     |             |
-| `control_count`<sup>[*\**](#control_count)</sup>    | control plane VM 數量。    | 必須等於 `1`           |
+| `control_count`<sup>[*2*](#control_count)</sup>    | control plane VM 數量。    | 必須等於 `1`           |
 | `master_count`     | master VM 數量。           | `2`           |
-| `worker_count`<sup>[*\**](#flavorcounts)</sup>     | worker VM 數量。           | 由 `create_vm.flavor_counts` 決定           |
+| `worker_count`<sup>[*3*](#flavorcounts)</sup>     | worker VM 數量。           | 由 `create_vm.flavor_counts` 決定           |
 |`ceph_control_count`| ceph control_count VM 數量。 | 必須等於 `1`|
 |`ceph_master_count`| ceph master VM 數量。 | `2`|
 |`ceph_worker_count`| ceph worker VM 數量。 | `3`|
 | `volume_count` | ceph sc 磁碟數量。 | `3` | 
 | `vol_size` | 預設資料碟大小 (GiB)。 | `100`     |
 | `cluster_cidr_args`| Kubernetes Pod 網路 CIDR。 | `10.0.0.0/16` |
-| `endpoint_target_group_name`<sup>[*\**](#endpoint_group)</sup>| Kubernetes Cluster Endpoint 所在的群組名稱。 | `loadbalancer` |
+| `endpoint_target_group_name`<sup>[*4*](#endpoint_group)</sup>| Kubernetes Cluster Endpoint 所在的群組名稱。 | `loadbalancer` |
 |`ceph_cluster_cidr_args`|Ceph Cluster Kubernetes Pod 網路 CIDR。| `10.0.0.0/16`|
-|`ceph_endpoint_target_group_name`<sup>[*\**](#endpoint_group)</sup>|Ceph Cluster Kubernetes Cluster Endpoint 所在的群組名稱。| `ceph_loadbalancer`|
-|`cp_target_group_name`<sup>[*\**](#target_group_name)</sup>|control-plan 群組名稱。| `control_plan`
-|`master_target_group_name`<sup>[*\**](#target_group_name)</sup>|master 群組名稱。| `masters`
-|`worker_target_group_name`<sup>[*\**](#target_group_name)</sup>|worker 群組名稱。| `workers`
-|`ceph_cp_target_group_name`<sup>[*\**](#target_group_name)</sup>| Ceph Control Plan 群組名稱。|`ceph_control_plan`
-|`ceph_master_target_group_name`<sup>[*\**](#target_group_name)</sup>| Ceph Master 群組名稱。|`ceph_masters`
-|`ceph_worker_target_group_name`<sup>[*\**](#target_group_name)</sup>| Ceph Worker 群組名稱。|`ceph_workers`
+|`ceph_endpoint_target_group_name`<sup>[*4*](#endpoint_group)</sup>|Ceph Cluster Kubernetes Cluster Endpoint 所在的群組名稱。| `ceph_loadbalancer`|
+|`cp_target_group_name`<sup>[*5*](#target_group_name)</sup>|control-plan 群組名稱。| `control_plan`
+|`master_target_group_name`<sup>[*5*](#target_group_name)</sup>|master 群組名稱。| `masters`
+|`worker_target_group_name`<sup>[*5*](#target_group_name)</sup>|worker 群組名稱。| `workers`
+|`ceph_cp_target_group_name`<sup>[*5*](#target_group_name)</sup>| Ceph Control Plan 群組名稱。|`ceph_control_plan`
+|`ceph_master_target_group_name`<sup>[*5*](#target_group_name)</sup>| Ceph Master 群組名稱。|`ceph_masters`
+|`ceph_worker_target_group_name`<sup>[*5*](#target_group_name)</sup>| Ceph Worker 群組名稱。|`ceph_workers`
 |`wait_etcd_timeout`|加入 Worker 後，等待 etcd 穩定的時間(秒)。| `20`
 ### add_node.yml參數
 
@@ -52,7 +52,7 @@
 | 參數                 | 說明                | 預設值               |
 |--------------------|-------------------|-------------------|
 |`add_cp_ip`	|欲新增 Node 集群之控制平面 IP。	|
-|`flavor_counts`<sup>[*\**](#flavorcounts)</sup>	|各類型 VM 規格的數量設定（dict）。	|	
+|`flavor_counts`<sup>[*3*](#flavorcounts)</sup>	|各類型 VM 規格的數量設定（dict）。	|	
 
 ### add_vol.yml參數
 | 參數                 | 說明                | 預設值               |
@@ -60,13 +60,13 @@
  | `ceph_add_cp_ip`|欲新增 Vol 集群之 Ceph 控制平面 IP。| 
  | `ceph_worker_flavor`|VM 規格。| `v.xsuper`
  | `max_vol_per_worker`|單節點 Vol 上限。| `2`
- | `volume_count`<sup>[*\**](#volume_count)</sup>|欲新增 Vol 數量。| `0`
+ | `volume_count`<sup>[*6*](#volume_count)</sup>|欲新增 Vol 數量。| `0`
  
 ### 各角色參數
 
 ---
 
-#### create vm<sup>[*\**](#creatvm)</sup>
+#### create vm<sup>[*7*](#creatvm)</sup>
 
 | 參數                     | 說明                               | 預設值                            |
 |------------------------|----------------------------------|--------------------------------|
@@ -77,12 +77,12 @@
 | `ceph_cp_flavor`               | Ceph Cluster Control Plan VM 規格。                           | `v.xsuper`                     |
 | `ceph_master_flavor`               | Ceph Cluster Master VM 規格。                           | `v.xsuper`                     |
 | `ceph_worker_flavor`               | Ceph Cluster Worker VM 規格。                           | `v.xsuper`                     |
-|`flavor_counts`<sup>[*\**](#flavorcounts)</sup>	|各類型 VM 規格的數量設定（dict）。	|
+|`flavor_counts`<sup>[*3*](#flavorcounts)</sup>	|各類型 VM 規格的數量設定（dict）。	|
 | `volume_size`          | 系統碟大小 (GiB)。                     | `100`                          |
 | `volume_type`          | 系統碟類型。                           | `block_storage-hdd`            |
 | `private_network`      | 私有網路名稱。                          | `default_network`              |
 | `sg_name`              | 安全群組名稱。                          |  *目前還沒有自動創建安全群組* |
-| `vm_name`<sup>[*\**](#vm_name)</sup>              | VM 基本名稱。                         |        動態計算               |
+| `vm_name`<sup>[*8*](#vm_name)</sup>              | VM 基本名稱。                         |        動態計算               |
 | `vm_desc`              | VM 描述。                           | \`\`                           |
 | `api_timeout`          | TWCC API 呼叫超時 (秒)。               | `600`                           |
 | `initial_waiting_time` | VM 建立後初始等待 (秒)。                  | `60`                           |
@@ -92,15 +92,15 @@
 | `ssh_interval`         | SSH 可用性檢查間隔 (秒)。                 | `20`                           |
 | `ssh_timeout`          | SSH 等待超時 (秒)。                    | `600`                          |
 | `ubuntu_version`       | Ubuntu 映像篩選名稱。                   | `Ubuntu-22.04`                 |
-| `init_command`<sup>[*\**](#init_command)</sup>         | VM 初始化命令 (cloud-init/User Data)。 | 
+| `init_command`<sup>[*9*](#init_command)</sup>         | VM 初始化命令 (cloud-init/User Data)。 | 
 
-#### create vol<sup>[*\**](#creatvol)</sup>
+#### create vol<sup>[*10*](#creatvol)</sup>
 
 | 參數                     | 說明                        | 預設值                            |
 |------------------------|---------------------------|--------------------------------|
 | `twcc_api_host`        | TWCC API 主機名稱。            | `openstack-taichung-default-2` |
-| `vol_name`<sup>[*\**](#vol_name)</sup>              | Volume 名稱，從 worker VMs 名取得前綴。          | 動態計算
-| `server_idx`<sup>[*\**](#server_idx)</sup>           | 要掛載 volume 的 VM 索引 (0 起)。 | `0`                            |
+| `vol_name`<sup>[*11*](#vol_name)</sup>              | Volume 名稱，從 worker VMs 名取得前綴。          | 動態計算
+| `server_idx`<sup>[*12*](#server_idx)</sup>           | 要掛載 volume 的 VM 索引 (0 起)。 | `0`                            |
 | `api_timeout`          | TWCC API 呼叫超時 (秒)。               | `600`                           |
 | `initial_waiting_time` | 建立後初始等待 (秒)。              | `60`                           |
 | `poll_interval`        | 狀態輪詢間隔 (秒)。               | `20`                           |
@@ -170,34 +170,34 @@
 | 參數                  | 說明                     | 預設值                                |
 |---------------------|------------------------|------------------------------------|
 |twcc_api_host|TWCC API 主機名稱。| "openstack-taichung-default-2"
-|  server_idx<sup>[*\**](#server_idx)</sup> |要掛載 volume 的 VM 索引 (0 起)。| 0
+|  server_idx<sup>[*12*](#server_idx)</sup> |要掛載 volume 的 VM 索引 (0 起)。| 0
     
 ---
 
-<a id="control_count"></a>
-> 1. 這裡由 `control_count` 所創建的 `control-plan` 指的是能夠使用 kubectl command 的主機並且初始 `kubeadm init` 指令也是在此主機上執行，其餘與 masters group 內的主機一樣。
-<a id="endpoint_group"></a>
-> 2. 此參數會創建一個群組拿來存 `control-plane-endpoint/ceph_control-plane-endpoint` 並把該群組的第一個 `IP:Port` 傳給 `kubeadm init --control-plane-endpoint` 來使用。
-<a id="target_group_name"></a>
-> 3. 此參數如需更動，也需手動更改 `k8s.yml` 內的 `hosts` 參數。
-<a id="creatvm"></a>
-> 4. 所有創建的 VM 會共用此設定檔內的參數。
 <a id="ssh_user"></a>
-> 5. 除創建相關腳本外 ( 部署 cilium 或部署 ceph 之類的 ) 的腳本，ssh登錄名之參數為 `kube_user` ，其由 k8s.yml 內的 `ansible_user` 傳遞並繼承全域參數 `ssh_user` 。 
-<a id="vm_name"></a>
-> 6. `vm_name` 會是以 `<timestamp>_<control/master/worker>-<idx>` 的形式表示。
-<a id="init_command"></a>
-> 7. 預設指令為 `sed -i '1iaccount sufficient pam_permit.so' /etc/pam.d/common-account  && echo "{{ ssh_user }}:{{ new_password }}" | chpasswd && printf "{{ ssh_user }} ALL=(ALL) NOPASSWD:ALL\nroot ALL=(ALL) NOPASSWD:ALL\n" >/etc/sudoers.d/{{ ssh_user }} && chmod 440 /etc/sudoers.d/{{ ssh_user }}` 此指令會在 `/etc/pam.d/common-account` 的第一行加上 `account sufficient pam_permit.so` ***這會讓 `pam_permit.so` 總是返回允許從而讓該文件內所有帳戶都不會因帳戶到期而被 PAM 拒絕***。
-<a id="creatvol"></a>
-> 8. 所有創建的 Vol 會共用此設定檔內的參數且每個 worker 都會有一個自己的 Vol。
-<a id="vol_name"></a>
-> 9. `vol_name` 會從 worker VM 名取得前綴 ( <timestamp><"vol"> )，但因需要迭代 worker idx 所以放在 `k8s.yml` 中設定。 
-<a id="server_idx"></a>
-> 10. 目前看每個 VM 只有一個，但其回傳的 `Response.Servers` 結構為 `list` ，以防萬一用 `idx` 來指定。
+> 1. 除創建相關腳本外 ( 部署 cilium 或部署 ceph 之類的 ) 的腳本，ssh登錄名之參數為 `kube_user` ，其由 k8s.yml 內的 `ansible_user` 傳遞並繼承全域參數 `ssh_user` 。
+<a id="control_count"></a>
+> 2. 這裡由 `control_count` 所創建的 `control-plan` 指的是能夠使用 kubectl command 的主機並且初始 `kubeadm init` 指令也是在此主機上執行，其餘與 masters group 內的主機一樣。
 <a id="flavorcounts"></a>
-> 11. `Worker` 數量會是 `flavor_counts` 總數。
+> 3. `Worker` 數量會是 `flavor_counts` 總數。
+<a id="endpoint_group"></a>
+> 4. 此參數會創建一個群組拿來存 `control-plane-endpoint/ceph_control-plane-endpoint` 並把該群組的第一個 `IP:Port` 傳給 `kubeadm init --control-plane-endpoint` 來使用。
+<a id="target_group_name"></a>
+> 5. 此參數如需更動，也需手動更改 `k8s.yml` 內的 `hosts` 參數。
 <a id="volume_count"></a>
-> 12. 如果超過 `max_vol_per_worker` 所限制的數量，腳本會自動新增新節點。
+> 6. 如果超過 `max_vol_per_worker` 所限制的數量，腳本會自動新增新節點。
+<a id="creatvm"></a>
+> 7. 所有創建的 VM 會共用此設定檔內的參數。
+<a id="vm_name"></a>
+> 8. `vm_name` 會是以 `<timestamp>_<control/master/worker>-<idx>` 的形式表示。
+<a id="init_command"></a>
+> 9. 預設指令為 `sed -i '1iaccount sufficient pam_permit.so' /etc/pam.d/common-account  && echo "{{ ssh_user }}:{{ new_password }}" | chpasswd && printf "{{ ssh_user }} ALL=(ALL) NOPASSWD:ALL\nroot ALL=(ALL) NOPASSWD:ALL\n" >/etc/sudoers.d/{{ ssh_user }} && chmod 440 /etc/sudoers.d/{{ ssh_user }}` 此指令會在 `/etc/pam.d/common-account` 的第一行加上 `account sufficient pam_permit.so` ***這會讓 `pam_permit.so` 總是返回允許從而讓該文件內所有帳戶都不會因帳戶到期而被 PAM 拒絕***。
+<a id="creatvol"></a>
+> 10. 所有創建的 Vol 會共用此設定檔內的參數且每個 worker 都會有一個自己的 Vol。
+<a id="vol_name"></a>
+> 11. `vol_name` 會從 worker VM 名取得前綴 ( <timestamp><"vol"> )，但因需要迭代 worker idx 所以放在 `k8s.yml` 中設定。 
+<a id="server_idx"></a>
+> 12. 目前看每個 VM 只有一個，但其回傳的 `Response.Servers` 結構為 `list` ，以防萬一用 `idx` 來指定。
 
 ## 使用方法
 
