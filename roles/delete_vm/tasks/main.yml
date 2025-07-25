@@ -12,9 +12,6 @@
   set_fact:
     delete_start: "{{ delete_start | int }}"
     delete_end:   "{{ delete_end   | int }}"
-  set_fact:
-    delete_start: "{{ delete_start | int }}"
-    delete_end:   "{{ delete_end   | int }}"
 
 - name: Select site IDs
   set_fact:
