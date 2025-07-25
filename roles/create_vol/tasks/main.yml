@@ -61,7 +61,7 @@
 - debug:
     msg: "Polling attempts: {{ status_check.attempts }}"
 
-- name: Fetch list of sites to find SITE_ID
+- name: Fetch list of sites to find SITE_SERVSER_ID
   uri:
     url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/sites/?project={{ twcc_project_id }}"
     method: GET
@@ -71,7 +71,7 @@
       x-api-key: "{{ twcc_api_key }}"
   register: sites_response
 
-- name: Search SITE_ID
+- name: Search SITE_SERVSER_ID
   set_fact:
     site_server_id: >-
       {{ (sites_response.json | selectattr('name','search', vol_name) | sort(attribute='create_time'))[-1].servers[server_idx | int].id }}
