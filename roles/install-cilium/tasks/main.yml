@@ -36,16 +36,33 @@
     dest: /usr/local/bin
     remote_src: yes
 
+# [Cilium installation is configured by one or more Helm values](https://docs.cilium.io/en/stable/configuration/index.html?utm_source=chatgpt.com)
+# This command routes all traffic through Cilium (eBPF).(for nginx ingress controller ds)
+# If you only want to enable HostPort while keeping traffic handled by kube-proxy, use the command below.
 - name: Run cilium install
   ansible.builtin.command: >
     cilium install
       --version {{ cilium_version }}
       --helm-set clusterPoolIPv4.cidr={{ cilium_cluster_cidr }}
       --helm-set ipv4NativeRoutingCIDR={{ cilium_cluster_cidr }}
+      --helm-set kubeProxyReplacement=true
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf 
   register: cilium_output
   changed_when: "'Already installed' not in cilium_output.stdout"
+
+#- name: Run cilium install
+  #ansible.builtin.command: >
+    #cilium install
+      #--version {{ cilium_version }}
+      #--helm-set clusterPoolIPv4.cidr={{ cilium_cluster_cidr }}
+      #--helm-set ipv4NativeRoutingCIDR={{ cilium_cluster_cidr }}
+      #--helm-set hostPort.enabled=true
+      #--helm-set kubeProxyReplacement=partial or false
+  #environment:
+    #KUBECONFIG: /etc/kubernetes/admin.conf
+  #register: cilium_output
+  #changed_when: "'Already installed' not in cilium_output.stdout"
 
 - name: Debug Cilium install output
   ansible.builtin.debug:
