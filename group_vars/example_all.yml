@@ -1,16 +1,16 @@
 # ── 全域參數 ───────────────────────────────────────────────────────────
 ssh_user: "ubuntu"
 secret: ""
-twcc_project_id:
+twcc_project_id: 
 twcc_solution_id: 
 twcc_api_key: ""
 
-control_count: 1
+control_count: 1  # 必須 = 1
 master_count: 2
 
-ceph_control_count: 1
+ceph_control_count: 1  # 必須 = 1
 ceph_master_count: 2
-ceph_worker_count: 3
+ceph_worker_count: 3  # 必須 >= 3
 
 volume_count: 3
 vol_size: 100
@@ -32,7 +32,11 @@ wait_etcd_timeout: 20
 
 # ── add_node.yml 參數 ───────────────────────────────────────────────────
 add_node:
-  add_cp_ip: ""
+  add_cp_name: ""
+  workers_listeners_port: "{{ create_lb.workers_listeners_port }}"
+  workers_members_port: 443
+  workers_hc_listeners_port: "{{ create_lb.workers_hc_listeners_port }}"
+  workers_hc_members_port: 80
   flavor_counts:
     v.super: 0
     v.xsuper: 0
@@ -50,10 +54,10 @@ add_node:
 
 # ── add_vol.yml 參數 ───────────────────────────────────────────────────
 add_vol:
-  ceph_add_cp_ip: ""
+  ceph_add_cp_name: ""
   ceph_worker_flavor: "v.xsuper"
   max_vol_per_worker: 2
-  volume_count: 0
+  volume_count: 1
 
 # ── create_vm Role 參數 ─────────────────────────────────────────────────
 create_vm:
@@ -65,13 +69,12 @@ create_vm:
   ceph_cp_flavor: "v.xsuper"
   ceph_master_flavor: "v.xsuper"
   ceph_worker_flavor: "v.xsuper"
-  
-  flavor_counts:
+  flavor_counts:  # 總數必須 >= 2
     v.super: 1
     v.xsuper: 0
     v.2xsuper: 0
     v.4xsuper: 0
-    v.8xsuper: 0
+    v.8xsuper: 1
     vgv.xsuper: 0
     vgv.xsuper(水冷): 0
     vgv.2xsuper: 0
@@ -111,8 +114,12 @@ create_lb:
   twcc_api_host: "openstack-taichung-default-2"
   lb_desc: ""
   pool_protocol: "TCP"
-  pool_port: 6443
-  members_port: 6443
+  masters_listeners_port: 6443
+  masters_members_port: 6443
+  workers_listeners_port: 443
+  workers_members_port: 443
+  workers_hc_listeners_port: 80
+  workers_hc_members_port: 80  
   method: "ROUND_ROBIN"
   private_ip_name: "default_network"
   enable_pub_ip: false
@@ -120,6 +127,12 @@ create_lb:
   initial_waiting_time: 60
   poll_interval: 20
   poll_retries: 30
+
+# ── update_lb Role 參數 ──────────────────────────────────────────────────
+update_lb:
+  twcc_api_host: "openstack-taichung-default-2"
+  target_pool_idx: 0
+  api_timeout: 600
 
 # ── install-cilium Role 參數 ───────────────────────────────────────────────
 install_cilium:
@@ -139,6 +152,7 @@ install_Nvidia_GPU_Operator:
   helm_script: "get_helm.sh"
   nvidia_repo_name: "nvidia"
   nvidia_repo_url: "https://helm.ngc.nvidia.com/nvidia"
+  nvidia_repo_dest: "/home/{{ ssh_user }}"
   gpu_operator_namespace: "gpu-operator"
   gpu_operator_chart: "nvidia/gpu-operator"
   gpu_operator_version: "v25.3.1"
@@ -160,3 +174,34 @@ install_Rook_Ceph:
 get_vol:
   twcc_api_host: "openstack-taichung-default-2"
   server_idx: 0
+
+# ── install nginx ingress controller Role 參數 ──────────────────────────────────────────────────
+install_nginx_ingress_controller:
+  nginx_ingress_repo_version: "v5.1.0"
+  nginx_ingress_repo_url:    "https://github.com/nginx/kubernetes-ingress.git"
+  nginx_ingress_repo_dest: "/home/{{ ssh_user }}/kubernetes-ingress"
+  wait_apiserver_retries: 30
+  wait_apiserver_delay: 20
+
+# ── get_ip Role 參數 ───────────────────────────────────────────
+get_ip:
+  twcc_api_host: "openstack-taichung-default-2"
+
+# ── install cert manager Role 參數 ───────────────────────────────────────────
+install_cert_manager:
+  cert_manager_version: "v1.18.2"
+  homebrew_install_url: "https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh"
+  wait_health_timeout: "5"
+
+# ── create issuer Role 參數 ───────────────────────────────────────────
+create_issuer:
+  ClusterIssuerName: "zerossl-production"
+  server: "https://acme.zerossl.com/v2/DV90"
+  email: "your-email@gmail.com"
+  privateKeySecretRef: "zerossl-prod"
+  ingressClassName: "nginx"
+  kid: ""
+  key: ""
+  kname: "zero-ssl-eabsecret"
+  secret_ns: "cert-manager"
+  dest: "/home/{{ ssh_user }}"
