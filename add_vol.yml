@@ -5,11 +5,12 @@
   connection: local
   gather_facts: false
   tasks:
-    - name: add {{ add_vol.ceph_add_cp_ip }} into [{{ ceph_cp_target_group_name }}]
-      add_host:
-        name: "{{ add_vol.ceph_add_cp_ip }}"
-        groups: "{{ ceph_cp_target_group_name }}"
-        ansible_host: "{{ add_vol.ceph_add_cp_ip }}"
+    - name: fetch {{ add_vol.ceph_add_cp_name }} ip & add group
+      import_role:
+        name: get_ip
+      vars:
+        vm_name: "{{ add_vol.ceph_add_cp_name }}"
+        target_group: "{{ ceph_cp_target_group_name }}"
 
 - name: Determine scaling needs
   hosts: ceph_control_plan
