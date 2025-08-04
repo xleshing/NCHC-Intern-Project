@@ -2,13 +2,13 @@
 - name: download & install Helm
   ansible.builtin.get_url:
     url: "{{ helm_get_url }}"
-    dest: "/home/{{ kube_user }}/.ansible/tmp/{{ helm_script }}"
+    dest: "{{ nvidia_repo_dest }}/{{ helm_script }}"
     mode: '0700'
 
 - name: run Helm script
   ansible.builtin.shell: "./{{ helm_script }}"
   args:
-    chdir: "/home/{{ kube_user }}/.ansible/tmp"
+    chdir: "{{ nvidia_repo_dest }}"
 
 - name: add NVIDIA Helm Repo
   ansible.builtin.shell: >
@@ -22,4 +22,4 @@
     helm install --wait --generate-name
     -n {{ gpu_operator_namespace }} --create-namespace
     {{ gpu_operator_chart }} --version {{ gpu_operator_version }}
-    --kubeconfig /home/{{ kube_user }}/.kube/config
+    --kubeconfig {{ nvidia_repo_dest }}/.kube/config
