@@ -1,0 +1,49 @@
+- name: "Apply cert-manager manifest"
+  ansible.builtin.command:
+    cmd: >
+      kubectl apply -f
+      https://github.com/cert-manager/cert-manager/releases/download/{{ cert_manager_version }}/cert-manager.yaml
+
+- name: "Ensure brew prefix parent exists"
+  ansible.builtin.file:
+    path: /home/linuxbrew
+    state: directory
+    owner: "{{ ssh_user }}"
+    group: "{{ ssh_user }}"
+    mode: '0755'
+  become: yes
+  vars:
+    ansible_become_pass: "{{ secret }}"
+
+- name: "Ensure brew can write into its install dir"
+  ansible.builtin.file:
+    path: /home/linuxbrew/.linuxbrew
+    state: directory
+    owner: "{{ ssh_user }}"
+    group: "{{ ssh_user }}"
+    mode: '0755'
+  become: yes
+  vars:
+    ansible_become_pass: "{{ secret }}"
+    
+- name: "Install Homebrew non-interactively"
+  ansible.builtin.shell: |
+    NONINTERACTIVE=1 \
+    /bin/bash -c "$(curl -fsSL {{ homebrew_install_url }})"
+
+- name: "Ensure there's a blank line before appending to .bashrc"
+  ansible.builtin.shell: echo >> /home/ubuntu/.bashrc
+
+- name: "Append Homebrew shellenv to .bashrc"
+  ansible.builtin.shell: echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> /home/ubuntu/.bashrc
+
+- name: "Load Homebrew env for current session"
+  ansible.builtin.shell: eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+
+- name: "Install cmctl"
+  ansible.builtin.command:
+    cmd: "/home/linuxbrew/.linuxbrew/bin/brew install cmctl"
+
+- name: "Wait for cert-manager API to be ready"
+  ansible.builtin.command:
+    cmd: "/home/linuxbrew/.linuxbrew/bin/cmctl check api --wait={{ wait_health_timeout }}m"

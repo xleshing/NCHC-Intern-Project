@@ -1,0 +1,3 @@
+cert_manager_version: "{{ install_cert_manager.cert_manager_version }}"
+homebrew_install_url: "{{ install_cert_manager.homebrew_install_url }}"
+wait_health_timeout: "{{ install_cert_manager.wait_health_timeout }}"
