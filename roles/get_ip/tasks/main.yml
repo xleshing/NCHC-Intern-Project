@@ -8,10 +8,22 @@
       x-api-key: "{{ twcc_api_key }}"
   register: sites_response
 
-- name: Determine SITE_ID of created VM
+- name: Filter sites matching vm_name
   set_fact:
-    site_id: >-
-      {{ (sites_response.json | selectattr('name','equalto', vm_name) | sort(attribute='create_time'))[-1].id }}
+    matching_sites: >-
+      {{ sites_response.json
+         | selectattr('name','equalto', vm_name)
+         | sort(attribute='create_time') }}
+  when: sites_response.json is defined
+
+- name: Fail if no matching VM found
+  ansible.builtin.fail:
+    msg: "No VM named '{{ vm_name }}' found; aborting task."
+  when: matching_sites | length == 0
+
+- name: Set SITE_ID
+  set_fact:
+    site_id: "{{ matching_sites[-1].id }}"
 
 - name: Retrieve VM internal IP
   uri:
