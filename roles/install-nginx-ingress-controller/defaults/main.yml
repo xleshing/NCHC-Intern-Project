@@ -1,0 +1,5 @@
+nginx_ingress_version: "{{ install_nginx_ingress_controller.nginx_ingress_repo_version }}"
+nginx_ingress_repo: "{{ install_nginx_ingress_controller.nginx_ingress_repo_url }}"
+nginx_ingress_src_dir: "{{ install_nginx_ingress_controller.nginx_ingress_repo_dest }}"
+wait_apiserver_retries: "{{ install_nginx_ingress_controller.wait_apiserver_retries }}"
+wait_apiserver_delay: "{{ install_nginx_ingress_controller.wait_apiserver_delay }}"
