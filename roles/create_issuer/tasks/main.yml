@@ -1,0 +1,13 @@
+- name: init ClusterIssuer yaml
+  ansible.builtin.template:
+    src: clusterissuer.yaml.j2
+    dest: "{{ dest }}/{{ cluster_issuer_name }}-clusterissuer.yaml"
+    mode: 0644
+
+- name: creat secret
+  ansible.builtin.shell: >
+    kubectl create secret generic "{{ kname }}" --namespace="{{ secret_ns }}" --from-literal=secret="{{ key }}"
+
+- name: apply ClusterIssuer
+  ansible.builtin.shell: >
+    kubectl apply -f "{{ dest }}/{{ cluster_issuer_name }}-clusterissuer.yaml"

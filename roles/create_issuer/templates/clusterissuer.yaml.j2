@@ -1,0 +1,19 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: "{{ cluster_issuer_name }}"
+spec:
+  acme:
+    server: "{{ server }}"
+    email: "{{ email }}"
+    privateKeySecretRef:
+      name: "{{ private_key_secret_ref }}"
+    externalAccountBinding:
+      keyID: "{{ kid }}"
+      keySecretRef:
+        name: "{{ kname }}"
+        key: secret
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: "{{ ingress_class_name }}"
