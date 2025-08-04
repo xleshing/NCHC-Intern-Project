@@ -209,7 +209,7 @@
 - name: Join Kubernetes Master
   hosts: masters
   become: true
-  # If do not execute the steps in order, a check etcd health timeout err may occur.
+  # If encounter a check etcd health timeout err, try uncommenting these lines to resolve the issue.
   #serial: 1
   vars:
 #    ansible_become_pass: "{{ secret }}"
@@ -235,7 +235,7 @@
 - name: Deploy Kubernetes Worker and using tokens
   hosts: workers
   become: true
-  # If not execute the steps in order, cilium pod Init:CrashLoopBackOff err may occur.
+  # If encounter a check etcd health timeout err, try uncommenting these lines to resolve the issue.
   #serial: 1
   vars:
 #    ansible_become_pass: "{{ secret }}"
@@ -291,7 +291,7 @@
 - name: Join ceph_Kubernetes Master
   hosts: ceph_masters
   become: true
-  # If not execute the steps in order, a check etcd health timeout err may occur.
+  # If encounter a check etcd health timeout err, try uncommenting these lines to resolve the issue.
   #serial: 1
   vars:
 #    ansible_become_pass: "{{ secret }}"
@@ -317,7 +317,7 @@
 - name: Deploy ceph_Kubernetes Worker and using tokens
   hosts: ceph_workers
   become: true 
-  # If not execute the steps in order, cilium pod Init:CrashLoopBackOff err may occur.
+  # If encounter a check etcd health timeout err, try uncommenting these lines to resolve the issue.
   #serial: 1
   vars:
 #    ansible_become_pass: "{{ secret }}"
