@@ -140,17 +140,12 @@
       loop_control:
         index_var: idx
 
-- name: Create ceph node Volumes
-  hosts: localhost
-  connection: local
-  gather_facts: false
-  tasks:
     - name: Create ceph node Volumes
       include_role:
         name: create_vol
       vars:
         vol_name: "{{ hostvars[ groups[ceph_worker_target_group_name][idx] ].vars.vm_name.split('_')[0]  }}"
-      loop: "{{ range(volume_count) | list }}"
+      loop: "{{ range(ceph_worker_count) | list }}"
       loop_control:
         index_var: idx
 
