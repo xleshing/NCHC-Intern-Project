@@ -1,0 +1,37 @@
+- name: Fetch list of sites to find SITE_ID
+  uri:
+    url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/sites/?project={{ twcc_project_id }}"
+    method: GET
+    headers:
+      Accept: application/json
+      x-api-host: "{{ twcc_api_host }}"
+      x-api-key: "{{ twcc_api_key }}"
+  register: sites_response
+
+- name: Determine SITE_ID of created VM
+  set_fact:
+    site_id: >-
+      {{ (sites_response.json | selectattr('name','equalto', vm_name) | sort(attribute='create_time'))[-1].id }}
+
+- name: Retrieve VM internal IP
+  uri:
+    url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/servers/?project={{ twcc_project_id }}&site={{ site_id }}"
+    method: GET
+    headers:
+      Accept: application/json
+      x-api-host: "{{ twcc_api_host }}"
+      x-api-key: "{{ twcc_api_key }}"
+  register: server_info
+
+- name: Set VM IP fact
+  set_fact:
+    vm_ip: "{{ server_info.json[0].private_nets[0].ip }}"
+
+- name: add VM to inventory
+  add_host:
+    name: "{{ server_info.json[0].private_nets[0].ip }}"
+    groups: "{{ target_group }}"
+    ansible_user: "{{ ssh_user }}"
+    vars:
+      ansible_host: "{{ server_info.json[0].private_nets[0].ip }}"
+      vm_name: "{{ vm_name }}"
