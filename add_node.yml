@@ -5,11 +5,12 @@
   connection: local
   gather_facts: false
   tasks:
-    - name: add {{ add_node.add_cp_ip }} into [{{ cp_target_group_name }}]
-      add_host:
-        name: "{{ add_node.add_cp_ip }}"
-        groups: "{{ cp_target_group_name }}"
-        ansible_host: "{{ add_node.add_cp_ip }}"
+    - name: fetch {{ add_node.add_cp_name }} ip & add group
+      import_role:
+        name: get_ip
+      vars:
+        vm_name: "{{ add_node.add_cp_name }}"
+        target_group: "{{ cp_target_group_name }}"
 
     - name: init worker_flavors
       set_fact:
@@ -33,6 +34,23 @@
       loop: "{{ worker_flavors }}"
       loop_control:
         index_var: idx
+
+- name: Update worker LoadBalancer
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    lb_name: "{{ add_node.add_cp_name.split('_')[0] }}_worker"
+    members_port: "{{ add_node.workers_members_port }}"
+    listeners_port: "{{ add_node.workers_listeners_port }}"
+    hc_members_port: "{{ add_node.workers_hc_members_port }}"
+    hc_listeners_port: "{{ add_node.workers_hc_listeners_port }}"
+    cp_pool_target_group_name: "{{ cp_target_group_name }}"
+    master_pool_target_group_name: "{{ master_target_group_name }}"
+    worker_pool_target_group_name: "{{ worker_target_group_name }}"
+    pool_member_target: "worker"
+  roles:
+    - update_lb
 
 - name: Time synchronization
   hosts: workers
