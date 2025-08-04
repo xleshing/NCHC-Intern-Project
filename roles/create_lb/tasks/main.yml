@@ -2,12 +2,22 @@
   set_fact:
     pool_members: []
 
-- name: add control_plan + masters to pool_members_list
+- name: Prepare pool_members_list for control-plane + masters
   set_fact:
     pool_members: "{{ pool_members + [ { 'ip': hostvars[item].vars.ansible_host, 'port': members_port } ] }}"
-  loop: "{{ (groups[cp_pool_target_group_name] | default([])) + (groups[master_pool_target_group_name] | default([])) }}"
+  loop: "{{ (groups[cp_pool_target_group_name] | default([]))
+            + (groups[master_pool_target_group_name] | default([])) }}"
   loop_control:
     loop_var: item
+  when: pool_member_target == 'control'
+
+- name: Prepare pool_members_list for workers
+  set_fact:
+    pool_members: "{{ pool_members + [ { 'ip': hostvars[item].vars.ansible_host, 'port': members_port } ] }}"
+  loop: "{{ groups[worker_pool_target_group_name] | default([]) }}"
+  loop_control:
+    loop_var: item
+  when: pool_member_target == 'worker'
 
 - name: get TWCC private list
   uri:
@@ -40,20 +50,20 @@
         x-api-key: "{{ twcc_api_key }}"
       body_format: json
       body:
-        name: "{{ lb_name }}lb"
+        name: "{{ lb_name }}"
         desc: "{{ lb_desc }}"
         private_net: "{{ private_ip_id }}"
         enable_public_ip: "{{ enable_pub_ip | bool }}"
         pools:
-          - name: "{{ lb_name }}pool"
+          - name: "{{ lb_name }}"
             protocol: "{{ pool_protocol }}"
             members: "{{ pool_members }}"
             method: "{{ method }}"
         listeners:
-          - name: "{{ lb_name }}listener"
-            pool_name: "{{ lb_name }}pool"
+          - name: "{{ lb_name }}"
+            pool_name: "{{ lb_name }}"
             protocol: "{{ pool_protocol }}"
-            protocol_port: "{{ pool_port }}"
+            protocol_port: "{{ listeners_port }}"
 
 - name: Create LB via TWCC API
   uri:
@@ -66,20 +76,20 @@
       x-api-key: "{{ twcc_api_key }}"
     body_format: json
     body: 
-      name: "{{ lb_name }}lb"
+      name: "{{ lb_name }}"
       desc: "{{ lb_desc }}"
       private_net: "{{ private_ip_id }}"
       enable_public_ip: "{{ enable_pub_ip | bool }}"
       pools:
-        - name: "{{ lb_name }}pool"
+        - name: "{{ lb_name }}"
           protocol: "{{ pool_protocol }}"
           members: "{{ pool_members }}"
           method: "{{ method }}"
       listeners:
-        - name: "{{ lb_name }}listener" 
-          pool_name: "{{ lb_name }}pool"
+        - name: "{{ lb_name }}" 
+          pool_name: "{{ lb_name }}"
           protocol: "{{ pool_protocol }}"
-          protocol_port: "{{ pool_port }}"
+          protocol_port: "{{ listeners_port }}"
     status_code: [200, 201]
     timeout: "{{ api_timeout }}"
   register: create_response
@@ -101,7 +111,7 @@
 - name: Determine LB_ID of created LB
   set_fact:
     lb_id: >-
-      {{ (lb_response.json | selectattr('name','equalto', lb_name + "lb") | sort(attribute='create_time'))[-1].id }}
+      {{ (lb_response.json | selectattr('name','equalto', lb_name) | sort(attribute='create_time'))[-1].id }}
 
 - name: Poll until LB status is ACTIVE
   uri:
@@ -124,8 +134,9 @@
 
 - name: add LB to inventory
   add_host:
-    name: "{{ status_check.json.private_ip }}:{{ pool_port }}"
+    name: "{{ status_check.json.private_ip }}:{{ listeners_port }}"
     groups: "{{ target_group }}"
     ansible_user: "{{ ssh_user }}"
     vars:
-      ansible_host: "{{ status_check.json.private_ip }}:{{ pool_port }}"
+      ansible_host: "{{ status_check.json.private_ip }}:{{ listeners_port }}"
+  when: pool_member_target == 'control'
