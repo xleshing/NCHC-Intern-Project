@@ -144,7 +144,7 @@
   ansible.builtin.shell: |
     kubectl -n rook-ceph exec {{ toolbox_pod.stdout }} -- \
       ceph mgr services --format json | \
-      jq -e '.prometheus | type=="string" and (. | length) > 0'
+      jq -re 'select(.prometheus | type=="string" and length > 0) | .prometheus'
   register: prometheus_result
   failed_when: false
   until: prometheus_result.rc == 0
