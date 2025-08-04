@@ -1,0 +1,3 @@
+twcc_api_host: "{{ update_lb.twcc_api_host }}"
+target_pool_idx: "{{ update_lb.target_pool_idx }}"
+api_timeout: "{{ update_lb.api_timeout }}"

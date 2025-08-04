@@ -1,0 +1,135 @@
+- name: init pool_members_list
+  set_fact:
+    pool_members: []
+
+- name: Prepare pool_members_list for workers
+  set_fact:
+    pool_members: "{{ pool_members + [ { 'ip': hostvars[item].vars.ansible_host, 'port': members_port } ] }}"
+  loop: "{{ groups[worker_pool_target_group_name] | default([]) }}"
+  loop_control:
+    loop_var: item
+  when: pool_member_target == 'worker'
+
+- name: Fetch list of loadbalancers to find LB_ID
+  uri:
+    url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/loadbalancers/?project={{ twcc_project_id }}"
+    method: GET
+    headers:
+      Accept: application/json
+      x-api-host: "{{ twcc_api_host }}"
+      x-api-key: "{{ twcc_api_key }}"
+  register: lb_response
+
+- name: Determine LB_ID
+  set_fact:
+    lb_id: >-
+      {{ (lb_response.json | selectattr('name','equalto', lb_name) | sort(attribute='create_time'))[-1].id }}
+
+- name: Get LB detail
+  uri:
+    url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/loadbalancers/{{ lb_id }}/"
+    method: GET
+    headers:
+      Accept: application/json
+      x-api-host: "{{ twcc_api_host }}"
+      x-api-key: "{{ twcc_api_key }}"
+  register: lb_detail
+- debug:
+    var: lb_detail
+
+- name: set LB_pools
+  set_fact:
+    lb_pools: "{{ lb_detail.json.pools[ (target_pool_idx | int) ] | default([]) }}"
+    lb_listens: "{{ lb_detail.json.listeners[ (target_pool_idx | int) ] | default([]) }}"
+  when: lb_detail.json.pools is defined and lb_detail.json.listeners is defined
+
+- name: add new members -> lb_pools
+  set_fact:
+    pools: "{{
+        lb_pools
+          | combine({
+              'members': ((lb_pools.members | default([])) + pool_members)
+                | map('combine', {'port': members_port})
+                | list
+            }, recursive=True)
+      }}"
+
+- name: set hc_pools
+  set_fact:
+    hc_pools: "{{
+        (pools
+          | combine({
+              'name': pools.name + '_hc',
+              'members': ((lb_pools.members | default([])) + pool_members)
+                | map('combine', {'port': hc_members_port})
+                | list
+            }, recursive=True))
+      }}"
+
+- name: add pool_name -> lb_listens
+  set_fact:
+    listens: "{{
+        (lb_listens
+          | combine({
+              'pool_name': pools.name,
+              'protocol_port': listeners_port,
+              'default_tls_container_ref': omit,
+              'sni_container_refs': omit
+            }, recursive=True))
+      }}"
+
+- name: set hc_listens
+  set_fact:
+    hc_listens: "{{
+        (listens
+          | combine({
+              'name': listens.name + '_hc',
+              'protocol_port': hc_listeners_port,
+              'pool_name': hc_pools.name,
+              'default_tls_container_ref': omit,
+              'sni_container_refs': omit
+            }, recursive=True))
+      }}"
+
+- debug:
+    msg: "{{ pools }}"
+- debug:
+    msg: "{{ hc_pools }}"
+- debug:
+    msg: "{{ listens }}"
+- debug:
+    msg: "{{ hc_listens }}"
+
+- name: "Build LB API payload"
+  set_fact:
+    lb_payload:
+      pools: [ "{{ pools }}", "{{ hc_pools }}" ]
+      listeners: [ "{{ listens }}", "{{ hc_listens }}" ]
+- debug:
+    var: lb_payload
+
+- debug:
+    msg:
+      headers:
+        Content-Type: application/json
+        Accept: application/json
+        x-api-host: "{{ twcc_api_host }}"
+        x-api-key: "{{ twcc_api_key }}"
+      body_format: json
+      body: "{{ lb_payload }}"
+
+- name: Upd LB via TWCC API
+  uri:
+    url: "https://apigateway.twcc.ai/api/v3/{{ twcc_api_host }}/loadbalancers/{{ lb_id }}/"
+    method: PATCH
+    headers:
+      Content-Type: application/json
+      Accept: application/json
+      x-api-host: "{{ twcc_api_host }}"
+      x-api-key: "{{ twcc_api_key }}"
+    body_format: json
+    body: "{{ lb_payload }}"
+    status_code: [200, 201]
+    timeout: "{{ api_timeout }}"
+  register: upd_response
+
