@@ -51,17 +51,54 @@
       loop_control:
         index_var: idx
 
-- name: Create LoadBalancer
+- name: Create master LoadBalancer
   hosts: localhost
   connection: local
   gather_facts: false
   vars:
     lb_name: "{{ hostvars[ groups[cp_target_group_name][0] ].vars.vm_name.split('_')[0] }}"
+    members_port: "{{ create_lb.masters_members_port }}"
+    listeners_port: "{{ create_lb.masters_listeners_port }}"
     cp_pool_target_group_name: "{{ cp_target_group_name }}"
     master_pool_target_group_name: "{{ master_target_group_name }}"
+    worker_pool_target_group_name: "{{ worker_target_group_name }}"
     target_group: "{{ endpoint_target_group_name }}"
+    pool_member_target: 'control'
   roles:
     - create_lb
+
+- name: Create worker LoadBalancer
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    lb_name: "{{ hostvars[ groups[cp_target_group_name][0] ].vars.vm_name.split('_')[0] }}_worker"
+    members_port: "{{ create_lb.workers_members_port }}"
+    listeners_port: "{{ create_lb.workers_listeners_port }}"
+    cp_pool_target_group_name: "{{ cp_target_group_name }}"
+    master_pool_target_group_name: "{{ master_target_group_name }}"
+    worker_pool_target_group_name: "{{ worker_target_group_name }}"
+    target_group: "{{ endpoint_target_group_name }}"
+    pool_member_target: 'worker'
+  roles:
+    - create_lb
+
+- name: Update worker LoadBalancer
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    lb_name: "{{ hostvars[ groups[cp_target_group_name][0] ].vars.vm_name.split('_')[0] }}_worker"
+    members_port: "{{ create_lb.workers_members_port }}"
+    listeners_port: "{{ create_lb.workers_listeners_port }}"
+    hc_members_port: "{{ create_lb.workers_hc_members_port }}"
+    hc_listeners_port: "{{ create_lb.workers_hc_listeners_port }}"
+    cp_pool_target_group_name: "{{ cp_target_group_name }}"
+    master_pool_target_group_name: "{{ master_target_group_name }}"
+    worker_pool_target_group_name: "{{ worker_target_group_name }}"
+    pool_member_target: ''
+  roles:
+    - update_lb
 # ── create_main_cluster_complet ────────────────────────────────────
 
 # ── create_ceph_cluster_start ──────────────────────────────────────
@@ -122,10 +159,14 @@
   connection: local
   gather_facts: false
   vars:
+    listeners_port: "{{ create_lb.masters_listeners_port }}"
+    members_port: "{{ create_lb.masters_members_port }}"
     lb_name: "{{ hostvars[ groups[ceph_cp_target_group_name][0] ].vars.vm_name.split('_')[0] }}"
     cp_pool_target_group_name: "{{ ceph_cp_target_group_name }}"
     master_pool_target_group_name: "{{ ceph_master_target_group_name }}"
+    worker_pool_target_group_name: "{{ ceph_worker_target_group_name }}"
     target_group: "{{ ceph_endpoint_target_group_name }}"
+    pool_member_target: 'control'
   roles:
     - create_lb
 # ── create_ceph_cluster_complet ────────────────────────────────────
@@ -174,7 +215,7 @@
   hosts: masters
   become: true
   # If do not execute the steps in order, a check etcd health timeout err may occur.
-  serial: 1
+  #serial: 1
   vars:
 #    ansible_become_pass: "{{ secret }}"
     join_endpoint: "{{ hostvars[ groups[cp_target_group_name][0] ].init_out.join_endpoint }}"
@@ -200,7 +241,7 @@
   hosts: workers
   become: true
   # If not execute the steps in order, cilium pod Init:CrashLoopBackOff err may occur.
-  serial: 1
+  #serial: 1
   vars:
 #    ansible_become_pass: "{{ secret }}"
     join_endpoint: "{{ hostvars[ groups[cp_target_group_name][0] ].init_out.join_endpoint }}"
@@ -256,7 +297,7 @@
   hosts: ceph_masters
   become: true
   # If not execute the steps in order, a check etcd health timeout err may occur.
-  serial: 1
+  #serial: 1
   vars:
 #    ansible_become_pass: "{{ secret }}"
     join_endpoint: "{{ hostvars[ groups[ceph_cp_target_group_name][0] ].ceph_init_out.join_endpoint }}"
@@ -282,7 +323,7 @@
   hosts: ceph_workers
   become: true 
   # If not execute the steps in order, cilium pod Init:CrashLoopBackOff err may occur.
-  serial: 1
+  #serial: 1
   vars:
 #    ansible_become_pass: "{{ secret }}"
     join_endpoint: "{{ hostvars[ groups[ceph_cp_target_group_name][0] ].ceph_init_out.join_endpoint }}"
@@ -314,28 +355,32 @@
 
 - name: install Rook-Ceph-provider
   hosts: ceph_control_plan
-  remote_user: "{{ ssh_user }}"
-  vars:
-    kube_user: "{{ ansible_user }}"
   roles:
     - install-Rook-Ceph-provider
 
 - name: install Rook-Ceph-consumer
   hosts: control_plan
-  remote_user: "{{ ssh_user }}"
   vars:
-    kube_user: "{{ ansible_user }}"
     rook_ceph_env: "{{ hostvars[ groups[ceph_cp_target_group_name][0] ].rook_ceph_env }}"
   roles:
     - install-Rook-Ceph-consumer
 
 - name: install Nvidia-GPU-Operator
   hosts: control_plan
-  remote_user: "{{ ssh_user }}"
-  become: true
-  vars:
-#    ansible_become_pass: "{{ secret }}"
-    kube_user: "{{ ansible_user }}"
   roles:
     - install-Nvidia-GPU-Operator
 
+- name: install Nginx-Ingress-Controller
+  hosts: control_plan
+  roles:
+    - install-nginx-ingress-controller
+
+- name: install Cert Manager      
+  hosts: control_plan
+  roles:
+    - install-cert-manager
+
+- name: create issuer
+  hosts: control_plan
+  roles:
+    - create_issuer
