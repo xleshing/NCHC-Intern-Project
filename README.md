@@ -139,12 +139,12 @@
 | `poll_interval`        | 狀態輪詢間隔 (秒)。                                         | `20`                           |
 | `poll_retries`         | 狀態輪詢重試次數。                                           | `30`                           |
 
-#### update lb
+#### update lb<sup>[*14*](#update_lb)</sup>
 
 | 參數               | 說明                    | 預設值      |
 |------------------|-----------------------|----------|
 | `twcc_api_host` | TWCC API 主機名稱。 | `openstack-taichung-default-2` |
-  |  `target_pool_idx`| Main Group Index<sup>[*14*](#main_group)</sup> | `0`
+  |  `target_pool_idx`| Main Group Index<sup>[*15*](#main_group)</sup> | `0`
   |`api_timeout`|TWCC API 呼叫超時 (秒)。| `600`
     
 #### install cilium
@@ -201,7 +201,7 @@
 |---------------------|------------------------|------------------------------------|
 |twcc_api_host|TWCC API 主機名稱。| "openstack-taichung-default-2"
     
-#### install nginx ingress controller 
+#### install nginx ingress controller<sup>[*16*](#nginx_ingress)</sup> 
 
 | 參數                  | 說明                     | 預設值                                |
 |---------------------|------------------------|------------------------------------|
@@ -262,8 +262,12 @@
 > 12. 目前看每個 `VM` 只有一個，但其回傳的 `Response.Servers` 結構為 `list` ，以防萬一用 `idx` 來指定。
 <a id="lb_name"></a>
 > 13. 此參數會從 control_plane VM 名取得前綴 ( 總共會有三個 `LB` 分別為 `<主集群 cp vm_name timestamp>`、`<主集群 cp vm_name timestamp＿worker>` 與 `<ceph 集群 cp vm_name timestamp>`) 
+<a id="update_lb"></a>
+> 14. 由於 `TWCC` 區別不同 pool 與 listener 的方式是基於 `name` 不是 `id`，所以在更新 `LB` 時所送出的 `Main Group` 與 `Health Check Group` 的 `id` 是一樣的(後者會被自動分配 `id`)。
 <a id="main_group"></a>
-> 14. 此 `role` 會把 `LB` 內的 `pools` 與 `listeners` 分為兩組（`Main Group` （由 `update_lb.target_pool_idx` 來指定第幾組為 `Main Group`）與 `Health Check Group`），並且更新 `LB` 邏輯是複製一份 `Main Group` 並把部分參數修改成傳入的值後，整組當作 `Health Check Group` ，所以無法單獨指定個別 `VM` 的對外 `port` ，且會覆蓋原有 `LB`。
+> 15. 此 `role` 會把 `LB` 內的 `pools` 與 `listeners` 分為兩組（`Main Group` （由 `update_lb.target_pool_idx` 來指定第幾組為 `Main Group`）與 `Health Check Group`），並且更新 `LB` 邏輯是複製一份 `Main Group` 並把部分參數修改成傳入的值後，整組當作 `Health Check Group` ，所以無法單獨指定個別 `VM` 的對外 `port` ，且會覆蓋原有 `LB`。
+<a id="nginx_ingress"></a>
+> 16. 預設全局 `ssl-redirect: "false"` 不強制轉發到 `443 port`，如需修改可在 `kubernetes-ingress/deployments/common/nginx-config.yaml` 內控制。
 
 ## 使用方法
 
