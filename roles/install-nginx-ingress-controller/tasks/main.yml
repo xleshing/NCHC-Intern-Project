@@ -1,56 +1,12 @@
-- name: Clone kubernetes-ingress {{ nginx_ingress_version }}
-  ansible.builtin.git:
-    repo:   "{{ nginx_ingress_repo }}"
-    dest:   "{{ nginx_ingress_src_dir }}"
-    version: "{{ nginx_ingress_version }}"
-
-- name: Apply ns-and-sa.yaml
-  ansible.builtin.command: >
-    kubectl apply -f {{ nginx_ingress_src_dir }}/deployments/common/ns-and-sa.yaml
-  register: apply_result
-  until: apply_result.rc == 0
-  retries: "{{ wait_apiserver_retries }}"
-  delay: "{{ wait_apiserver_delay }}"
-
-- name: Apply rbac.yaml
-  ansible.builtin.command: >
-    kubectl apply -f {{ nginx_ingress_src_dir }}/deployments/rbac/rbac.yaml
-
-- name: add ssl-redirect 'false' into nginx-config
-  ansible.builtin.lineinfile:
-    path: '{{ nginx_ingress_src_dir }}/deployments/common/nginx-config.yaml'
-    insertafter: '^data:$'
-    line: '  ssl-redirect: "false"'
-    backup: yes
-
-- name: Apply nginx-config.yaml
-  ansible.builtin.command: >
-    kubectl apply -f {{ nginx_ingress_src_dir }}/deployments/common/nginx-config.yaml
-
-- name: Apply ingress-class.yaml
-  ansible.builtin.command: >
-    kubectl apply -f {{ nginx_ingress_src_dir }}/deployments/common/ingress-class.yaml
-
-- name: Apply CRD virtualservers.yaml
-  ansible.builtin.command: >
-    kubectl apply -f {{ nginx_ingress_src_dir }}/config/crd/bases/k8s.nginx.org_virtualservers.yaml
-
-- name: Apply CRD virtualserverroutes.yaml
-  ansible.builtin.command: >
-    kubectl apply -f {{ nginx_ingress_src_dir }}/config/crd/bases/k8s.nginx.org_virtualserverroutes.yaml
-
-- name: Apply CRD transportservers.yaml
-  ansible.builtin.command: >
-    kubectl apply -f {{ nginx_ingress_src_dir }}/config/crd/bases/k8s.nginx.org_transportservers.yaml
-
-- name: Apply CRD policies.yaml
-  ansible.builtin.command: >
-    kubectl apply -f {{ nginx_ingress_src_dir }}/config/crd/bases/k8s.nginx.org_policies.yaml
-
-- name: Apply CRD globalconfigurations.yaml
-  ansible.builtin.command: >
-    kubectl apply -f {{ nginx_ingress_src_dir }}/config/crd/bases/k8s.nginx.org_globalconfigurations.yaml
-
-- name: Apply nginx-ingress DaemonSet
-  ansible.builtin.command: >
-    kubectl apply -f {{ nginx_ingress_src_dir }}/deployments/daemon-set/nginx-ingress.yaml
+- name: install Ingress Nginx
+  ansible.builtin.shell: >
+    helm upgrade  --install ingress-nginx ingress-nginx \   
+    --repo "{{ nginx_ingress_repo }}" \   
+    --namespace ingress-nginx --create-namespace \   
+    --set controller.kind=DaemonSet \   
+    --set controller.service.type=ClusterIP \   
+    --set controller.hostPort.enabled=true \   
+    --set controller.hostPort.http=80 \   
+    --set controller.hostPort.https=443 \
+    --set controller.config.strict-validate-path-type=false \
+    --version "{{ nginx_ingress_version }}"
