@@ -360,6 +360,7 @@
   roles:
     - install-Rook-Ceph-consumer
 
+# This step cannot be moved later, as it includes the installation of Helm and all subsequent steps depend on Helm
 - name: install Nvidia-GPU-Operator
   hosts: control_plan
   roles:
@@ -370,7 +371,7 @@
   roles:
     - install-nginx-ingress-controller
 
-- name: install Cert Manager      
+- name: install Cert Manager
   hosts: control_plan
   roles:
     - install-cert-manager
