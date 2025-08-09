@@ -115,6 +115,9 @@ add_vol:
   ceph_worker_flavor: "v.xsuper"  # VM 規格。 
   max_vol_per_worker: 2  # 單節點 Vol 上限。
   volume_count: 0  # 欲新增 Vol 數量。 
+  vol_size: 100  # 資料碟大小 (GiB)。
+  vol_type: "hdd"  # 資料碟類型。
+  server_idx: 0  # 要掛載 volume 的 VM Server 索引。
 
 # ── create_vm Role 參數 ─────────────────────────────────────────────────
 create_vm:

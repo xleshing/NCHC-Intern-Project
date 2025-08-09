@@ -139,10 +139,13 @@
 
 | 參數                                                   | 說明                             | 預設值        |
 |------------------------------------------------------|--------------------------------|------------|
- | `ceph_add_cp_name`                                   | 欲新增 Vol 集群之 Ceph 控制平面 vm_name。 |            |
+| `ceph_add_cp_name`                                   | 欲新增 Vol 集群之 Ceph 控制平面 vm_name。 |            |
 | `ceph_worker_flavor`                                 | VM 規格。                         | `v.xsuper` |
 | `max_vol_per_worker`<sup>[*11*](#volume_count)</sup> | 單節點 Vol 上限。                    | `2`        |
 | `volume_count`                                       | 欲新增 Vol 數量。                    | `0`        |
+| `vol_size`                                           | 資料碟大小 (GiB)。                   | `100` |
+| `vol_type`                                           | 資料碟類型。                         | `hdd` |
+| `server_idx`<sup>[*8*](#server_idx)</sup>            | 要掛載 volume 的 VM Server 索引。    | `0`   |
 
 ## 各角色參數
 

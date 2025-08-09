@@ -56,4 +56,7 @@
     name: create_vol
   vars:
     vol_name: "{{ target_worker }}"
+    vol_size: "{{ add_vol.vol_size }}"
+    vol_type: "{{ add_vol.vol_type }}"
+    server_idx: "{{ add_vol.server_idx }}"
   when: target_worker != ''
