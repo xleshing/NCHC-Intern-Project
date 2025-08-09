@@ -1,43 +1,100 @@
 # ── 全域參數 ───────────────────────────────────────────────────────────
-ssh_user: "ubuntu"
-secret: ""
-twcc_project_id: 
-twcc_solution_id: 
-twcc_api_key: ""
+ssh_user: "ubuntu"  # 所有遠端主機 SSH 登入使用者。
+secret: ""  # ssh_user 的密碼。
+twcc_project_id:   # TWCC 專案 ID。
+twcc_solution_id:   # TWCC 解決方案 ID。
+twcc_api_key: ""  # TWCC API Key。
 
-control_count: 1  # 必須 = 1
-master_count: 2
+control_count: 1  # control plane VM 數量。(數量必須 == 1)
+master_count: 2  # master VM 數量。
 
-ceph_control_count: 1  # 必須 = 1
-ceph_master_count: 2
-ceph_worker_count: 3  # 必須 >= 3
+ceph_control_count: 1  # ceph control_count VM 數量。(數量必須 == 1)
+ceph_master_count: 2  # ceph master VM 數量。
+ceph_worker_count: 3  # ceph worker VM 數量。(數量必須 >= 3)
 
-volume_count: 3
-vol_size: 100
+cluster_cidr_args: "10.0.0.0/16"  # Kubernetes Pod 網路 CIDR。
+endpoint_target_group_name: "loadbalancer"  # Kubernetes Cluster Endpoint 所在的群組名稱。
 
-cluster_cidr_args: "10.0.0.0/16"
-endpoint_target_group_name: "loadbalancer"
+ceph_cluster_cidr_args: "10.0.0.0/16"  # Ceph Cluster Kubernetes Pod 網路 CIDR。
+ceph_endpoint_target_group_name: "ceph_loadbalancer"  # Ceph Cluster Kubernetes Cluster Endpoint 所在的群組名稱。
 
-ceph_cluster_cidr_args: "10.0.0.0/16"
-ceph_endpoint_target_group_name: "ceph_loadbalancer"
+cp_target_group_name: "control_plan"  # control-plan 群組名稱。
+master_target_group_name: "masters"  # master 群組名稱。
+worker_target_group_name: "workers"  # worker 群組名稱。
 
-cp_target_group_name: "control_plan"
-master_target_group_name: "masters"
-worker_target_group_name: "workers"
+ceph_cp_target_group_name: "ceph_control_plan"  # Ceph Control Plan 群組名稱。
+ceph_master_target_group_name: "ceph_masters"  # Ceph Master 群組名稱。
+ceph_worker_target_group_name: "ceph_workers"  # Ceph Worker 群組名稱。
+wait_etcd_timeout: 20  # 加入 Worker 後，等待 etcd 穩定的時間(秒)。
 
-ceph_cp_target_group_name: "ceph_control_plan"
-ceph_master_target_group_name: "ceph_masters"
-ceph_worker_target_group_name: "ceph_workers"
-wait_etcd_timeout: 20
+# ── k8s 參數 ───────────────────────────────────────────────────
+k8s:
+  key_pair_name: ""  # 注入 VM 的 Key Pair 名稱。
+  cp_flavor: "v.xsuper"  # Control Plan VM 規格。
+  master_flavor: "v.xsuper"  # Master VM 規格。
+  ceph_cp_flavor: "v.xsuper"  # Ceph Cluster Control Plan VM 規格
+  ceph_master_flavor: "v.xsuper"  # Ceph Cluster Master VM 規格。
+  ceph_worker_flavor: "v.xsuper"  # Ceph Cluster Worker VM 規格。
+  flavor_counts:  # 各類型 VM 規格的數量設定（dict）。(總數必須 >= 2)
+    v.super: 1
+    v.xsuper: 0
+    v.2xsuper: 0
+    v.4xsuper: 0
+    v.8xsuper: 1
+    vgv.xsuper: 0
+    vgv.xsuper(水冷): 0
+    vgv.2xsuper: 0
+    vgv.2xsuper(水冷): 0
+    vgv.4xsuper: 0
+    vgv.4xsuper(水冷): 0
+    vgv.8xsuper: 0
+    vgv.8xsuper(水冷): 0
+  volume_size: 100  # 系統碟大小 (GiB)。
+  volume_type: "block_storage-hdd"  # 系統碟類型。
+  private_network: "default_network"  # 私有網路名稱。
+  sg_name: ""  # 安全群組名稱。
+  vm_desc: ""  # VM 描述。
+  ubuntu_version: "Ubuntu-22.04"  # Ubuntu 映像名稱。
+  init_command: sed -i '1iaccount sufficient pam_permit.so' /etc/pam.d/common-account  && echo -e "{{ ssh_user }}:{{ secret }}\nroot:{{ secret }}" | chpasswd && printf "{{ ssh_user }} ALL=(ALL) NOPASSWD:ALL\nroot ALL=(ALL) NOPASSWD:ALL\n" >/etc/sudoers.d/{{ ssh_user }} && chmod 440 /etc/sudoers.d/{{ ssh_user }}  # VM 初始化命令 (cloud-init/User Data)。
 
-# ── add_node.yml 參數 ───────────────────────────────────────────────────
+  vol_size: 100  # 資料碟大小 (GiB)。
+  vol_type: "hdd"  # 資料碟類型。
+  server_idx: 0  # 要掛載 volume 的 VM Server 索引。
+
+  lb_desc: ""  # LoadBalancer 描述。
+  pool_protocol: "TCP"  # Pool 通訊協定 (HTTP/TCP/HTTPS)。
+  masters_listeners_port: 6443  # 給 Masters 用的 LB 之 Listener 埠
+  masters_members_port: 6443  # 給 Masters 用的 LB 之 Members 埠
+  workers_listeners_port: 443  # 給 Workers 用的 LB 之 Listener 埠
+  workers_members_port: 443  # 給 Workers 用的 LB 之 Members 埠
+  workers_hc_listeners_port: 80  # 給 Workers 用來 Health Check 的 LB 之 Listener 埠
+  workers_hc_members_port: 80  # 給 Workers 用來 Health Check 的 LB 之 Members 埠
+  method: "ROUND_ROBIN"  # 負載演算法 (ROUND_ROBIN/LEAST_CONNECTIONS/SOURCE_IP)。
+  private_ip_name: "default_network"  # 私有網路名稱，對應 TWCC 回傳的 network name。
+  enable_pub_ip: false  # 是否分配公網浮動 IP (boolean)。
+
+  cilium_version: "1.17.5"  # Cilium Helm Chart 版本。(github)
+  ntp_servers:  # NTP 伺服器清單。
+    - "ntp1.aliyun.com iburst"
+    - "ntp2.aliyun.com iburst"
+    - "ntp3.aliyun.com iburst"
+  gpu_operator_version: "v25.3.1"  # GPU Operator Chart 版本。(Helm)
+  rook_repo_version: "v1.17.6"  # Rook-Ceph 版本。(github)
+  nginx_ingress_repo_version: "4.13.0"  # Nginx Ingress Controller 版本。(Helm)
+  cert_manager_version: "v1.18.2"  # Cert Manager 版本。(github)
+  
+  email: ""  # ACME 帳號綁定的聯繫信箱，用於接收過期提醒等。
+  kid: ""  # ZeroSSL 提供的 External Account Binding（EAB）Key ID。
+  key: ""  # 與上面 kid 對應的 EAB HMAC Key
+
+# ── add_node 參數 ───────────────────────────────────────────────────
 add_node:
-  add_cp_name: ""
-  workers_listeners_port: "{{ create_lb.workers_listeners_port }}"
-  workers_members_port: 443
-  workers_hc_listeners_port: "{{ create_lb.workers_hc_listeners_port }}"
-  workers_hc_members_port: 80
-  flavor_counts:
+  add_cp_name: ""  # 欲新增 Node 集群之控制平面 vm_name。
+  workers_listeners_port: "{{ create_lb.workers_listeners_port }}"  # 給 Workers 用的 LB 之 Listener 埠
+  workers_members_port: 443  # 給 Workers 用的 LB 之 Members 埠
+  workers_hc_listeners_port: "{{ create_lb.workers_hc_listeners_port }}"  # 給 Workers 用來 Health Check 的 LB 之 Listener 埠
+  workers_hc_members_port: 80  # 給 Workers 用來 Health Check 的 LB 之 Members 埠
+  flavor_counts:  # 各類型 VM 規格的數量設定（dict）。
     v.super: 0
     v.xsuper: 0
     v.2xsuper: 0
@@ -52,156 +109,141 @@ add_node:
     vgv.8xsuper: 0
     vgv.8xsuper(水冷): 0
 
-# ── add_vol.yml 參數 ───────────────────────────────────────────────────
+# ── add_vol 參數 ───────────────────────────────────────────────────
 add_vol:
-  ceph_add_cp_name: ""
-  ceph_worker_flavor: "v.xsuper"
-  max_vol_per_worker: 2
-  volume_count: 1
+  ceph_add_cp_name: ""  # 欲新增 Vol 集群之 Ceph 控制平面 vm_name。
+  ceph_worker_flavor: "v.xsuper"  # VM 規格。 
+  max_vol_per_worker: 2  # 單節點 Vol 上限。
+  volume_count: 0  # 欲新增 Vol 數量。 
 
 # ── create_vm Role 參數 ─────────────────────────────────────────────────
 create_vm:
-  twcc_api_host: "openstack-taichung-default-2"
-  key_pair_name: ""
-  cp_flavor: "v.xsuper"
-  master_flavor: "v.xsuper"
+  twcc_api_host: "openstack-taichung-default-2"  # TWCC API 主機名稱。
+  key_pair_name: "{{ k8s.key_pair_name }}"  # 注入 VM 的 Key Pair 名稱。
+  cp_flavor: "{{ k8s.cp_flavor }}"  # Control Plan VM 規格。
+  master_flavor: "{{ k8s.master_flavor }}"  # Master VM 規格。 
 
-  ceph_cp_flavor: "v.xsuper"
-  ceph_master_flavor: "v.xsuper"
-  ceph_worker_flavor: "v.xsuper"
-  flavor_counts:  # 總數必須 >= 2
-    v.super: 1
-    v.xsuper: 0
-    v.2xsuper: 0
-    v.4xsuper: 0
-    v.8xsuper: 1
-    vgv.xsuper: 0
-    vgv.xsuper(水冷): 0
-    vgv.2xsuper: 0
-    vgv.2xsuper(水冷): 0
-    vgv.4xsuper: 0
-    vgv.4xsuper(水冷): 0
-    vgv.8xsuper: 0
-    vgv.8xsuper(水冷): 0
-  volume_size: 100
-  volume_type: "block_storage-hdd"
-  private_network: "default_network"
-  sg_name: ""
-  vm_desc: ""
-  api_timeout: 600
-  initial_waiting_time: 60
-  poll_interval: 20
-  poll_retries: 30
-  vm_ssh_port: 22
-  ssh_interval: 20
-  ssh_timeout: 600
-  ubuntu_version: "Ubuntu-22.04"
-  init_command: sed -i '1iaccount sufficient pam_permit.so' /etc/pam.d/common-account  && echo -e "{{ ssh_user }}:{{ secret }}\nroot:{{ secret }}" | chpasswd && printf "{{ ssh_user }} ALL=(ALL) NOPASSWD:ALL\nroot ALL=(ALL) NOPASSWD:ALL\n" >/etc/sudoers.d/{{ ssh_user }} && chmod 440 /etc/sudoers.d/{{ ssh_user }}
+  ceph_cp_flavor: "{{ k8s.ceph_cp_flavor }}"  # Ceph Cluster Control Plan VM 規格。
+  ceph_master_flavor: "{{ k8s.ceph_master_flavor }}"  # Ceph Cluster Master VM 規格。
+  ceph_worker_flavor: "{{ k8s.ceph_worker_flavor }}"  # Ceph Cluster Worker VM 規格。
+  
+  flavor_counts: "{{ k8s.flavor_counts }}"  # 各類型 VM 規格的數量設定（dict）。
+  volume_size: "{{ k8s.volume_size }}"  # 系統碟大小 (GiB)。
+  volume_type: "{{ k8s.volume_type }}"  # 系統碟類型。
+  private_network: "{{ k8s.private_network }}"  # 私有網路名稱。
+  sg_name: "{{ k8s.sg_name }}"  # 安全群組名稱。
+  vm_desc: "{{ k8s.vm_desc }}"  # VM 描述。
+  api_timeout: 600  # TWCC API 呼叫超時 (秒)。
+  initial_waiting_time: 60  # VM 建立後初始等待 (秒)。
+  poll_interval: 20  # VM 狀態輪詢間隔 (秒)。
+  poll_retries: 30  # VM 狀態輪詢重試次數。
+  vm_ssh_port: 22  # VM SSH 連接埠。
+  ssh_interval: 20  # SSH 可用性檢查間隔 (秒)。
+  ssh_timeout: 600  # SSH 等待超時 (秒)。 
+  ubuntu_version: "{{ k8s.ubuntu_version }}"  # Ubuntu 映像名稱。
+  init_command: "{{ k8s.init_command }}"  # VM 初始化命令 (cloud-init/User Data)。
 
  
 # ── create_vol Role 參數 ─────────────────────────────────────────────────
 create_vol:
-  twcc_api_host: "openstack-taichung-default-2"
-  server_idx: 0
-  api_timeout: 600
-  initial_waiting_time: 60
-  poll_interval: 20
-  poll_retries: 30
-  vol_type: "hdd"
+  twcc_api_host: "openstack-taichung-default-2"  # TWCC API 主機名稱。
+  vol_size: "{{ k8s.vol_size }}"  # 資料碟大小 (GiB)。
+  vol_type: "{{ k8s.vol_type }}"  # 資料碟類型。
+  server_idx: "{{ k8s.server_idx }}"  # 要掛載 volume 的 VM Server 索引。  
+  api_timeout: 600  # TWCC API 呼叫超時 (秒)。
+  initial_waiting_time: 60  # 建立後初始等待 (秒)。
+  poll_interval: 20  # 狀態輪詢間隔 (秒)。
+  poll_retries: 30  # 狀態輪詢重試次數。
 
 # ── create_lb Role 參數 ──────────────────────────────────────────────────
 create_lb:
-  twcc_api_host: "openstack-taichung-default-2"
-  lb_desc: ""
-  pool_protocol: "TCP"
-  masters_listeners_port: 6443
-  masters_members_port: 6443
-  workers_listeners_port: 443
-  workers_members_port: 443
-  workers_hc_listeners_port: 80
-  workers_hc_members_port: 80  
-  method: "ROUND_ROBIN"
-  private_ip_name: "default_network"
-  enable_pub_ip: false
-  api_timeout: 600
-  initial_waiting_time: 60
-  poll_interval: 20
-  poll_retries: 30
+  twcc_api_host: "openstack-taichung-default-2"  # TWCC API 主機名稱。
+  lb_desc: "{{ k8s.lb_desc }}"  # LoadBalancer 描述。 
+  pool_protocol: "{{ k8s.pool_protocol }}"  # Pool 通訊協定 (HTTP/TCP/HTTPS)。
+  masters_listeners_port: "{{ k8s.masters_listeners_port }}"  # 給 Masters 用的 LB 之 Listener 埠
+  masters_members_port: "{{ k8s.masters_members_port }}"  # 給 Masters 用的 LB 之 Members 埠
+  workers_listeners_port: "{{ k8s.workers_listeners_port }}"  # 給 Workers 用的 LB 之 Listener 埠 
+  workers_members_port: "{{ k8s.workers_members_port }}"  # 給 Workers 用的 LB 之 Members 埠
+  workers_hc_listeners_port: "{{ k8s.workers_hc_listeners_port }}"  # 給 Workers 用來 Health Check 的 LB 之 Listener 埠
+  workers_hc_members_port: "{{ k8s.workers_hc_members_port }}"  # 給 Workers 用來 Health Check 的 LB 之  Members 埠
+  method: "{{ k8s.method }}"  # 負載演算法 (ROUND\_ROBIN/LEAST\_CONNECTIONS/SOURCE\_IP)。
+  private_ip_name: "{{ k8s.private_ip_name }}"  # 私有網路名稱，對應 TWCC 回傳的 network name。
+  enable_pub_ip: "{{ k8s.enable_pub_ip }}"  # 是否分配公網浮動 IP (boolean)。
+  api_timeout: 600  # TWCC API 呼叫超時 (秒)。
+  initial_waiting_time: 60  # 建立後初始等待 (秒)。
+  poll_interval: 20  # 狀態輪詢間隔 (秒)。
+  poll_retries: 30  # 狀態輪詢重試次數。
 
 # ── update_lb Role 參數 ──────────────────────────────────────────────────
 update_lb:
-  twcc_api_host: "openstack-taichung-default-2"
-  target_pool_idx: 0
-  api_timeout: 600
+  twcc_api_host: "openstack-taichung-default-2"  # TWCC API 主機名稱。
+  target_pool_idx: 0  # Main Group Index
+  api_timeout: 600  # TWCC API 呼叫超時 (秒)。
 
 # ── install-cilium Role 參數 ───────────────────────────────────────────────
 install_cilium:
-  cilium_version: "1.17.5"
+  cilium_version: "{{ k8s.cilium_version }}"  # Cilium Helm Chart 版本。(github)
 
 # ── install-ntp Role 參數 ────────────────────────────────────────────────
 install_ntp:
-  ntp_driftfile: "/var/lib/ntp/ntp.drift"
-  ntp_servers:
-    - "ntp1.aliyun.com iburst"
-    - "ntp2.aliyun.com iburst"
-    - "ntp3.aliyun.com iburst"
+  ntp_driftfile: "/var/lib/ntp/ntp.drift"  # NTP drift file 路徑。
+  ntp_servers: "{{ k8s.ntp_servers }}"  # NTP 伺服器清單。
 
 # ── install-Nvidia-GPU-Operator Role 參數 ─────────────────────────────────
 install_Nvidia_GPU_Operator:
-  helm_get_url: "https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3"
-  helm_script: "get_helm.sh"
-  nvidia_repo_name: "nvidia"
-  nvidia_repo_url: "https://helm.ngc.nvidia.com/nvidia"
-  nvidia_repo_dest: "/home/{{ ssh_user }}"
-  gpu_operator_namespace: "gpu-operator"
-  gpu_operator_chart: "nvidia/gpu-operator"
-  gpu_operator_version: "v25.3.1"
+  helm_get_url: "https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3"  # Helm 安裝 script URL。
+  helm_script: "get_helm.sh"  # 本地 Helm 安裝腳本檔名。
+  nvidia_repo_name: "nvidia"  # NVIDIA Helm Repo 名稱。
+  nvidia_repo_url: "https://helm.ngc.nvidia.com/nvidia"  # NVIDIA Helm Repo URL。
+  nvidia_repo_dest: "/home/{{ ssh_user }}"  # Helm 安裝腳本本地 clone 位置。
+  gpu_operator_namespace: "gpu-operator"  # GPU Operator namespace。
+  gpu_operator_chart: "nvidia/gpu-operator"  # GPU Operator Chart 名稱。
+  gpu_operator_version: "{{ k8s.gpu_operator_version }}"  # GPU Operator Chart 版本。(Helm)
 
 # ── install-Rook-Ceph Role 參數 ───────────────────────────────────────────
 install_Rook_Ceph:
-  rook_repo_url: "https://github.com/rook/rook.git"
-  rook_repo_version: "v1.17.6"
-  rook_repo_dest: "/home/{{ ssh_user }}/rook"
-  wait_etcd_timeout: 20
-  wait_health_retries: 30 
-  wait_health_delay: 20
-  wait_retries: 30
-  wait_delay: 20
-  wait_prometheus_retries: 30
-  wait_prometheus_delay: 20
+  rook_repo_url: "https://github.com/rook/rook.git"  # Rook-Ceph GitHub Repo URL。
+  rook_repo_version: "{{ k8s.rook_repo_version }}"  # Rook-Ceph 版本。(github) 
+  rook_repo_dest: "/home/{{ ssh_user }}/rook"  # Rook-Ceph 本地 clone 位置。
+  wait_etcd_timeout: 20  # 創建ceph資源後，等待 etcd 穩定的時間(秒)。 
+  wait_health_retries: 30  # ceph cluster 健康狀態輪詢重試次數。
+  wait_health_delay: 20  # ceph cluster 健康狀態輪詢間隔(秒)。
+  wait_retries: 30  # cephfs-filesystem 與 rbd-data-pool 狀態輪詢重試次數。
+  wait_delay: 20  # cephfs-filesystem 與 rbd-data-pool 健康狀態輪詢間隔(秒)。
+  wait_prometheus_retries: 30  # Prometheus Endpoint 健康狀態輪詢重試次數。
+  wait_prometheus_delay: 20  # Prometheus Endpoint 狀態輪詢間隔(秒)。
 
 # ── get_vol Role 參數 ───────────────────────────────────────────
 get_vol:
-  twcc_api_host: "openstack-taichung-default-2"
-  server_idx: 0
-
-# ── install nginx ingress controller Role 參數 ──────────────────────────────────────────────────
-install_nginx_ingress_controller:
-  nginx_ingress_repo_version: "v5.1.0"
-  nginx_ingress_repo_url:    "https://github.com/nginx/kubernetes-ingress.git"
-  nginx_ingress_repo_dest: "/home/{{ ssh_user }}/kubernetes-ingress"
-  wait_apiserver_retries: 30
-  wait_apiserver_delay: 20
+  twcc_api_host: "openstack-taichung-default-2"  # TWCC API 主機名稱。
+  server_idx: 0  # 要掛載 volume 的 VM Server 索引。
 
 # ── get_ip Role 參數 ───────────────────────────────────────────
 get_ip:
-  twcc_api_host: "openstack-taichung-default-2"
+  twcc_api_host: "openstack-taichung-default-2"  # TWCC API 主機名稱。
+
+# ── install nginx ingress controller Role 參數 ──────────────────────────────────────────────────
+install_nginx_ingress_controller:
+  nginx_ingress_repo_version: "{{ k8s.nginx_ingress_repo_version }}"  # Nginx Ingress Controller 版本。(Helm) 
+  nginx_ingress_repo_url: "https://kubernetes.github.io/ingress-nginx"  # Nginx Ingress Controller GitHub Repo URL。
+  wait_apiserver_retries: 30  # 嘗試部署 nginx ingress controller yaml 重試次數。
+  wait_apiserver_delay: 20  # 嘗試部署 nginx ingress controller yaml 重試間隔(秒)。
 
 # ── install cert manager Role 參數 ───────────────────────────────────────────
 install_cert_manager:
-  cert_manager_version: "v1.18.2"
-  homebrew_install_url: "https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh"
-  wait_health_timeout: "5"
+  cert_manager_version: "{{ k8s.cert_manager_version }}"  # Cert Manager 版本。(github)
+  homebrew_install_url: "https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh"  # Homebrew GitHub Repo URL。 
+  wait_health_timeout: "10"  # Cert Manager 健康狀態等待時間(分鐘)。
 
 # ── create issuer Role 參數 ───────────────────────────────────────────
 create_issuer:
-  ClusterIssuerName: "zerossl-production"
-  server: "https://acme.zerossl.com/v2/DV90"
-  email: "your-email@gmail.com"
-  privateKeySecretRef: "zerossl-prod"
-  ingressClassName: "nginx"
-  kid: ""
-  key: ""
-  kname: "zero-ssl-eabsecret"
-  secret_ns: "cert-manager"
-  dest: "/home/{{ ssh_user }}"
+  ClusterIssuerName: "zerossl-production"  # Cluster Issuer 名稱。 
+  server: "https://acme.zerossl.com/v2/DV90"  # ACME Server URL。 
+  email: "{{ k8s.email }}"  # ACME 帳號綁定的聯繫信箱，用於接收過期提醒等。
+  privateKeySecretRef: "zerossl-prod"  # 存放 ACME 帳號私鑰的 Kubernetes Secret 名稱。
+  ingressClassName: "nginx"  # cert-manager 創建 HTTP-01 驗證用臨時 Ingress 時所使用的 IngressClass 名稱。
+  kid: "{{ k8s.kid }}"  # ZeroSSL 提供的 External Account Binding（EAB）Key ID。
+  key: "{{ k8s.key }}"  # 與上面 kid 對應的 EAB HMAC Key 
+  kname: "zero-ssl-eabsecret"  # 存放上述 EAB 憑證（kid 和 key）的 Kubernetes Secret 名稱。   
+  secret_ns: "cert-manager"  # 用於創建和查找上述 EAB Secret 的命名空間。 
+  dest: "/home/{{ ssh_user }}"  # 在本地渲染并输出 ClusterIssuer YAML 時所使用的目錄。
